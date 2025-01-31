@@ -21,6 +21,7 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PostInitializeComponents() override;
 protected:
 	virtual void BeginPlay() override;
 
@@ -37,12 +38,22 @@ protected:
 	UInputAction* LookUpAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
 	UInputAction* JumpAction;
-
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
+	UInputAction* EquipAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
+	UInputAction* CrouchAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
+	UInputAction* AimAction;
+	
 	
 	void MoveForward(const FInputActionValue& Value);
 	void MoveRight(const FInputActionValue& Value);
 	void Turn(const FInputActionValue& Value);
 	void LookUp(const FInputActionValue& Value);
+	void EquipButtonPressed(const FInputActionValue& Value);
+	void CrouchButtonPressed(const FInputActionValue& Value);
+	void AimButtonPressed(const FInputActionValue& Value);
+	void AimButtonReleased(const FInputActionValue& Value);
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
@@ -59,8 +70,20 @@ private:
 
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
+
+	UPROPERTY(VisibleAnywhere)
+	class UCombatComponent* Combat;
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipButtonPressed();
 public:	
 	void SetOverlappingWeapon(AWeapon* Weapon);
-
+	bool IsWeaponEquipped();
+	bool IsAiming();
 };
+
+
+
+
+
 
