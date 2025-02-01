@@ -7,18 +7,25 @@
 #include "Blaster/Weapon/Weapon.h"
 #include "Components/SphereComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 
 UCombatComponent::UCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	
+	BaseWalkSpeed = 600.f;
+	AimWalkSpeed = 450.f;
 }
 
 
 void UCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
+	if(Character)
+	{
+		Character->GetCharacterMovement()->MaxWalkSpeed = BaseWalkSpeed;
+	}
 }
 
 
@@ -32,6 +39,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
+	DOREPLIFETIME(UCombatComponent, bAiming);
 }
 
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
@@ -40,6 +48,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 	{
 		return;
 	}
+	
 	EquippedWeapon = WeaponToEquip;
 	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
 	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
@@ -48,7 +57,18 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 		HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
 	}
 	EquippedWeapon->SetOwner(Character);
+	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+	Character->bUseControllerRotationYaw = true;
+}
+void UCombatComponent::OnRep_EquippedWeapon()
+{
 
+	if (EquippedWeapon && Character)
+	{
+
+		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		Character->bUseControllerRotationYaw = true;
+	}
 }
 void UCombatComponent::SetAiming(bool bIsAiming)
 {
@@ -58,6 +78,12 @@ void UCombatComponent::SetAiming(bool bIsAiming)
 
 	// Not matter if a Client or the Server calls this, it's gonna execute on the Server
 	ServerSetAiming(bIsAiming);
+
+	if (Character)
+	{
+		Character->GetCharacterMovement()->MaxWalkSpeed = bIsAiming? AimWalkSpeed : BaseWalkSpeed;
+	}
+		
 }
 
 void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)
@@ -65,5 +91,10 @@ void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)
 	// set bAiming on the Server, bAiming being a replicated var it will notify all Clients
 	// that the associated character is aiming, for everyone to see.
 	bAiming = bIsAiming;
+
+	if (Character)
+	{
+		Character->GetCharacterMovement()->MaxWalkSpeed = bIsAiming? AimWalkSpeed : BaseWalkSpeed;
+	}
 }
 
