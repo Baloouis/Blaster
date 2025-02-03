@@ -72,7 +72,7 @@ private:
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
 	UPROPERTY(VisibleAnywhere)
-	class UCombatComponent* Combat;
+	class UCombatComponent* CombatComp;
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
@@ -84,8 +84,10 @@ public:
 	void SetOverlappingWeapon(AWeapon* Weapon);
 	bool IsWeaponEquipped();
 	bool IsAiming();
-	FORCEINLINE float GetAOYaw() { return AO_Yaw; }
-	FORCEINLINE float GetAOPitch() { return AO_Pitch; }
+	FORCEINLINE float GetAOYaw() const { return AO_Yaw; }
+	FORCEINLINE float GetAOPitch() const { return AO_Pitch; }
+	AWeapon* GetEquippedWeapon() const;
+	
 };
 
 

@@ -12,7 +12,7 @@
 
 UCombatComponent::UCombatComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
 	
 	BaseWalkSpeed = 600.f;
 	AimWalkSpeed = 450.f;
@@ -44,6 +44,7 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty
 
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
+	
 	if (Character == nullptr || WeaponToEquip == nullptr)
 	{
 		return;
@@ -65,7 +66,6 @@ void UCombatComponent::OnRep_EquippedWeapon()
 
 	if (EquippedWeapon && Character)
 	{
-
 		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
 		Character->bUseControllerRotationYaw = true;
 	}

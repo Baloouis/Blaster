@@ -34,8 +34,8 @@ ABlasterCharacter::ABlasterCharacter()
 	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
 	OverheadWidget -> SetupAttachment(RootComponent);
 
-	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
-	Combat->SetIsReplicated(true);
+	CombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+	CombatComp->SetIsReplicated(true);
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
@@ -101,9 +101,9 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 void ABlasterCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if (Combat)
+	if (CombatComp)
 	{
-		Combat->Character = this;
+		CombatComp->Character = this;
 	}
 }
 
@@ -149,11 +149,11 @@ void ABlasterCharacter::LookUp(const FInputActionValue& Value)
 
 void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 {
-	if (Combat)
+	if (CombatComp)
 	{
 		if (HasAuthority()) // We're on the Server
 		{
-			Combat->EquipWeapon(OverlappingWeapon);
+			CombatComp->EquipWeapon(OverlappingWeapon);
 		}
 		else // We're on a Client
 		{
@@ -164,9 +164,9 @@ void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
-	if (Combat)
+	if (CombatComp)
 	{
-		Combat->EquipWeapon(OverlappingWeapon);
+		CombatComp->EquipWeapon(OverlappingWeapon);
 	}
 }
 
@@ -184,9 +184,9 @@ void ABlasterCharacter::CrouchButtonPressed(const FInputActionValue& Value)
 
 void ABlasterCharacter::AimButtonPressed(const FInputActionValue& Value)
 {
-	if (Combat)
+	if (CombatComp)
 	{
-		Combat->SetAiming(Value.Get<bool>());
+		CombatComp->SetAiming(Value.Get<bool>());
 	}
 }
 
@@ -226,19 +226,28 @@ void ABlasterCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 bool ABlasterCharacter::IsWeaponEquipped()
 {
 
-	bool bRes = (Combat && Combat->EquippedWeapon);
+	bool bRes = (CombatComp && CombatComp->EquippedWeapon);
 
 	return bRes;
 }
 
 bool ABlasterCharacter::IsAiming()
 {
-	return (Combat && Combat->bAiming);
+	return (CombatComp && CombatComp->bAiming);
+}
+
+AWeapon* ABlasterCharacter::GetEquippedWeapon() const
+{
+	if ( CombatComp == nullptr )
+	{
+		return nullptr;
+	}
+	return CombatComp->EquippedWeapon;
 }
 
 void ABlasterCharacter::AimOffset(float DeltaTime)
 {
-	if (Combat && Combat->EquippedWeapon == nullptr)
+	if (CombatComp && CombatComp->EquippedWeapon == nullptr)
 	{
 		return;
 	}
@@ -262,4 +271,12 @@ void ABlasterCharacter::AimOffset(float DeltaTime)
 	}
 
 	AO_Pitch = GetBaseAimRotation().Pitch;
+	// To take into account the effect of CharacterMovement compression on FRotators that erase rotation winding
+	if (AO_Pitch > 90.f && !IsLocallyControlled())
+	{
+		// map pitch from [270, 360) to [-90, 0)
+		FVector2D InRange(270.f, 360.f);
+		FVector2D OutRange(-90.f, 0.f);
+		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
+	}
 }

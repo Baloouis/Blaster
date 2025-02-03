@@ -5,6 +5,9 @@
 #include "BlasterCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Blaster/Weapon/Weapon.h"
+
+
 
 void UBlasterAnimInstance::NativeInitializeAnimation()
 {
@@ -31,13 +34,10 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	Speed = Velocity.Size();
 
 	bIsInAir = BlasterCharacter->GetCharacterMovement()->IsFalling();
-
 	bIsAccelerating = BlasterCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size()>0;
-
 	bWeaponEquipped = BlasterCharacter->IsWeaponEquipped();
-
+	EquippedWeapon = BlasterCharacter->GetEquippedWeapon();
 	bIsCrouch = BlasterCharacter->bIsCrouched;
-
 	bAiming =  BlasterCharacter->IsAiming();
 
 	//Offset Yaw for Strafing
@@ -57,4 +57,18 @@ void UBlasterAnimInstance::NativeUpdateAnimation(float DeltaTime)
 
 	AO_Yaw = BlasterCharacter->GetAOYaw();
 	AO_Pitch = BlasterCharacter->GetAOPitch();
+
+	if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh() && BlasterCharacter->GetMesh())
+	{
+		//Get Socket Transform in WORLD space
+		LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), RTS_World);
+
+		//Convert Socket WORLD space Transform to relative to local space
+		// right hand bone has been chosen but it could have been root bone too
+		FVector OutPosition;
+		FRotator OutRotation;
+		BlasterCharacter->GetMesh()->TransformToBoneSpace(FName("hand_r"), LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPosition, OutRotation);
+		LeftHandTransform.SetLocation(OutPosition);
+		LeftHandTransform.SetRotation(FQuat(OutRotation));
+	}
 }
