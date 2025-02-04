@@ -100,6 +100,7 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(EquipAction, ETriggerEvent::Triggered, this, &ThisClass::EquipButtonPressed);
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Triggered , this, &ThisClass::CrouchButtonPressed);
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Triggered , this, &ThisClass::AimButtonPressed);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered , this, &ThisClass::FireButtonPressed);
 		
 		
 	}
@@ -110,6 +111,21 @@ void ABlasterCharacter::PostInitializeComponents()
 	if (CombatComp)
 	{
 		CombatComp->Character = this;
+	}
+}
+
+void ABlasterCharacter::PlayFireMontage(bool bAiming)
+{
+	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr)
+	{
+		return;
+	}
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && FireWeaponMontage)
+	{
+		AnimInstance->Montage_Play(FireWeaponMontage);
+		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
 
@@ -204,6 +220,14 @@ void ABlasterCharacter::AimButtonPressed(const FInputActionValue& Value)
 	if (CombatComp)
 	{
 		CombatComp->SetAiming(Value.Get<bool>());
+	}
+}
+
+void ABlasterCharacter::FireButtonPressed(const FInputActionValue& Value)
+{
+	if (CombatComp)
+	{
+		CombatComp->FireButtonPressed(Value.Get<bool>());
 	}
 }
 

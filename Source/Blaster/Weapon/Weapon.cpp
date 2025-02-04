@@ -106,10 +106,18 @@ void AWeapon::OnRep_WeaponState()
 }
 
 void AWeapon::ShowPickupWidget(bool bShowWidget)
-{
+{ 
 	if (PickupWidget)
 	{
 		PickupWidget->SetVisibility(bShowWidget);
+	}
+}
+
+void AWeapon::Fire()
+{
+	if (FireAnimation)
+	{
+		WeaponMesh->PlayAnimation(FireAnimation, false);
 	}
 }
 

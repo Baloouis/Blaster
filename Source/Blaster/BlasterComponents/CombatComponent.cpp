@@ -18,6 +18,12 @@ UCombatComponent::UCombatComponent()
 	AimWalkSpeed = 450.f;
 }
 
+void UCombatComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
+	DOREPLIFETIME(UCombatComponent, bAiming);
+}
 
 void UCombatComponent::BeginPlay()
 {
@@ -35,12 +41,7 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 }
 
-void UCombatComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UCombatComponent, EquippedWeapon);
-	DOREPLIFETIME(UCombatComponent, bAiming);
-}
+
 
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
@@ -70,6 +71,42 @@ void UCombatComponent::OnRep_EquippedWeapon()
 		Character->bUseControllerRotationYaw = true;
 	}
 }
+
+//Can be called on both the Clients or the Server
+void UCombatComponent::FireButtonPressed(bool bPressed)
+{
+	bFireButtonPressed = bPressed;
+
+	if(bFireButtonPressed)
+	{
+		//Server RPC
+		ServerFire();
+	}
+}
+
+//This is only executed on the Server side
+void UCombatComponent::ServerFire_Implementation()
+{
+	//This will make sure every Client will execute MulticastFire_Implementation
+	MulticastFire();
+}
+
+
+// A multicast RPC called from the server is executed on the Server and all Clients
+void UCombatComponent::MulticastFire_Implementation()
+{
+	if (EquippedWeapon==nullptr)
+	{
+		return;
+	}
+	if (Character)
+	{
+		Character->PlayFireMontage(bAiming);
+		EquippedWeapon->Fire();
+	}
+}
+
+
 void UCombatComponent::SetAiming(bool bIsAiming)
 {
 	// we're setting bAiming right away so that Client running this code can see its player aim without waiting
