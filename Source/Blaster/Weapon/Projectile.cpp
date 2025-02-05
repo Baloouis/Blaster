@@ -4,12 +4,15 @@
 #include "Projectile.h"
 
 #include "Components/BoxComponent.h"
-#include "Components/SphereComponent.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Sound/SoundCue.h"
+#include "Kismet/GameplayStatics.h"
 
 AProjectile::AProjectile()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
+	bReplicates = true;
+	
 	CollisionBox = CreateDefaultSubobject<UBoxComponent>("CollisionBox");
 	SetRootComponent(CollisionBox);
 	CollisionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
@@ -17,13 +20,39 @@ AProjectile::AProjectile()
 	CollisionBox->SetCollisionResponseToChannels(ECR_Ignore);
 	CollisionBox->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
 	CollisionBox->SetCollisionResponseToChannel(ECC_WorldStatic,ECR_Block);
+
+	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
+	ProjectileMovementComponent->bRotationFollowsVelocity = true;
+	
 }
 
 
 void AProjectile::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	if (Tracer)
+	{
+		TracerComponent = UGameplayStatics::SpawnEmitterAttached(
+			Tracer,
+			CollisionBox,
+			FName(),
+			GetActorLocation(),
+			GetActorRotation(),
+			EAttachLocation::KeepWorldPosition
+			);
+	}
+	if (HasAuthority())
+	{
+		//OnHit events for Projectiles will only be generated on the Server
+		CollisionBox->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);
+	}
+}
+
+void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	FVector NormalImpulse, const FHitResult& Hit)
+{
+	Destroy();
 }
 
 void AProjectile::Tick(float DeltaTime)
@@ -32,3 +61,17 @@ void AProjectile::Tick(float DeltaTime)
 
 }
 
+
+void AProjectile::Destroyed()
+{
+	Super::Destroyed();
+
+	if (ImpactParticles)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, GetActorTransform());
+	}
+	if (ImpactSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());
+	}
+}

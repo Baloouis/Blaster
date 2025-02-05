@@ -8,6 +8,7 @@
 #include "Components/SphereComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 UCombatComponent::UCombatComponent()
@@ -38,7 +39,6 @@ void UCombatComponent::BeginPlay()
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
 }
 
 
@@ -72,28 +72,68 @@ void UCombatComponent::OnRep_EquippedWeapon()
 	}
 }
 
-//Can be called on both the Clients or the Server
+// Can be called on both the Clients or the Server
+//( NB : but is only called on the character controller by the player on their machine,
+//not simulated proxies )
 void UCombatComponent::FireButtonPressed(bool bPressed)
 {
 	bFireButtonPressed = bPressed;
 
 	if(bFireButtonPressed)
 	{
+		FHitResult HitResult;
+		TracerUnderCrosshairs(HitResult);
+		
 		//Server RPC
-		ServerFire();
+		ServerFire(HitResult.ImpactPoint);
+	}
+}
+
+void UCombatComponent::TracerUnderCrosshairs(FHitResult& TraceHitResult)
+{
+	FVector2D ViewportSize;
+	if (GEngine && GEngine->GameViewport)
+	{
+		//Get coordinates of center of the screen in ScreenSpace
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+	}
+
+	FVector2D CrossHairLocation(ViewportSize.X / 2, ViewportSize.Y / 2);
+
+	// Turn ScreenSpace coordinates to WorldSpace position and direction
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+		UGameplayStatics::GetPlayerController(this, 0),
+		CrossHairLocation,
+		CrosshairWorldPosition,
+		CrosshairWorldDirection
+		);
+	if (bScreenToWorld)
+	{
+		FVector Start = CrosshairWorldPosition;
+		FVector End = Start + CrosshairWorldDirection  * TRACE_LENGTH;
+
+		GetWorld()->LineTraceSingleByChannel(
+			TraceHitResult,
+			Start,
+			End,
+			ECC_Visibility
+			);
+		
 	}
 }
 
 //This is only executed on the Server side
-void UCombatComponent::ServerFire_Implementation()
+void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	//This will make sure every Client will execute MulticastFire_Implementation
-	MulticastFire();
+	MulticastFire(TraceHitTarget);
 }
 
 
 // A multicast RPC called from the server is executed on the Server and all Clients
-void UCombatComponent::MulticastFire_Implementation()
+void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
 {
 	if (EquippedWeapon==nullptr)
 	{
@@ -102,7 +142,7 @@ void UCombatComponent::MulticastFire_Implementation()
 	if (Character)
 	{
 		Character->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire();
+		EquippedWeapon->Fire(TraceHitTarget);
 	}
 }
 
