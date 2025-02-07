@@ -13,38 +13,46 @@ void ABlasterHUD::DrawHUD()
         GEngine->GameViewport->GetViewportSize(ViewportSize);
         const FVector2D ViewportCenter(ViewportSize.X /2.f, ViewportSize.Y /2.f);
 
+        float SpreadScaled = CrosshairSpreadMax * HUDPackage.CrosshairSpread;
         if (HUDPackage.CrosshairsCenter)
         {
-            DrawCrosshair(HUDPackage.CrosshairsCenter, ViewportCenter);
+            DrawCrosshair(HUDPackage.CrosshairsCenter, ViewportCenter, FVector2D::Zero(), HUDPackage.CrosshairsColor);
         }
         if (HUDPackage.CrosshairsRight)
         {
-            DrawCrosshair(HUDPackage.CrosshairsRight, ViewportCenter);
+            FVector2D Spread(SpreadScaled, 0.f);
+            DrawCrosshair(HUDPackage.CrosshairsRight, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
         }
         if (HUDPackage.CrosshairsLeft)
         {
-            DrawCrosshair(HUDPackage.CrosshairsLeft, ViewportCenter);
+            FVector2D Spread(-SpreadScaled, 0.f);
+
+            DrawCrosshair(HUDPackage.CrosshairsLeft, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
         }
         if (HUDPackage.CrosshairsTop)
         {
-            DrawCrosshair(HUDPackage.CrosshairsTop, ViewportCenter);
+            // Y value is set to negative because in UV space upward is the negative Y direction
+            FVector2D Spread(0.f, -SpreadScaled); 
+            DrawCrosshair(HUDPackage.CrosshairsTop, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
         }
-        if (HUDPackage.CrosshairsBottom)
+        if (HUDPackage.CrosshairsBottom) 
         {
-            DrawCrosshair(HUDPackage.CrosshairsBottom, ViewportCenter);
+            // Y value is set to positive because in UV space downward is the positive Y direction
+            FVector2D Spread(0.f, SpreadScaled);
+            DrawCrosshair(HUDPackage.CrosshairsBottom, ViewportCenter, Spread, HUDPackage.CrosshairsColor);
         } 
     }
 }
 
-void ABlasterHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter)
+void ABlasterHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter, FVector2D Spread, FLinearColor CrosshairColor)
 {
     const float TextureWidth = Texture->GetSizeX();
     const float TextureHeight = Texture->GetSizeY();
     // If we dont offset the DrawPoint from the ViewportCenter, then the top left corner would be placed at this position
     // That is why we offset by half its width and height
     const FVector2D TextureDrawPoint(
-        ViewportCenter.X - (TextureWidth / 2.f),
-        ViewportCenter.Y - (TextureHeight / 2.f)
+        ViewportCenter.X - (TextureWidth / 2.f) + Spread.X,
+        ViewportCenter.Y - (TextureHeight / 2.f) + Spread.Y
         );
     DrawTexture(
         Texture,
@@ -56,7 +64,7 @@ void ABlasterHUD::DrawCrosshair(UTexture2D* Texture, FVector2D ViewportCenter)
         0.f,
         1.f,
         1.f,
-        FLinearColor::White
+        CrosshairColor
         );
 }
 
