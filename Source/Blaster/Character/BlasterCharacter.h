@@ -27,6 +27,8 @@ public:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHit();
+
+	virtual void OnRep_ReplicatedMovement() override;
 protected:
 	virtual void BeginPlay() override;
 
@@ -63,6 +65,7 @@ protected:
 	virtual void Jump() override;
 
 	void AimOffset(float DeltaTime);
+	void SimProxiesTurn();
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class USpringArmComponent* CameraBoom;
@@ -103,6 +106,16 @@ private:
 	void HideCharacterIfCameraClose();
 	UPROPERTY(EditAnywhere)
 	float CameraHideCharacterThreshold = 200.f;
+
+	void CalculateAO_Pitch();
+	bool bRotateRootBone;
+	float TurnThreshold = 0.5f;
+	FRotator ProxyRotationLastFrame;
+	FRotator ProxyRotation;
+	float ProxyYaw;
+	float TimeSinceLastMovementReplication;
+	float CalculateSpeed();
+
 public:	
 	void SetOverlappingWeapon(AWeapon* Weapon);
 	bool IsWeaponEquipped();
@@ -114,10 +127,10 @@ public:
 
 	FVector GetHitTarget() const;
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+	
+	FORCEINLINE bool ShouldRotateRootBone() const { return bRotateRootBone; }
 
 };
-
-
 
 
 

@@ -11,6 +11,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 
 UCombatComponent::UCombatComponent()
 {
@@ -30,6 +31,8 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty
 void UCombatComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	bCanFire = true;
+
 	if(Character)
 	{
 		Character->GetCharacterMovement()->MaxWalkSpeed = BaseWalkSpeed;
@@ -41,7 +44,6 @@ void UCombatComponent::BeginPlay()
 		}
 	}
 }
-
 
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -56,6 +58,170 @@ void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 
 		SetHUDCrosshairs(DeltaTime);
 		InterpFOV(DeltaTime);
+	}
+}
+
+// Can be called on both the Clients or the Server
+//( NB : but is only called on the character controller by the player on their machine,
+//not simulated proxies )
+void UCombatComponent::FireButtonPressed(bool bPressed)
+{
+	bFireButtonPressed = bPressed;
+
+	if(bFireButtonPressed && EquippedWeapon)
+	{
+		Fire();
+	}
+}
+
+void UCombatComponent::StartFireTimer()
+{
+	if (EquippedWeapon ==nullptr || Character == nullptr )
+	{
+		return;
+	}
+	Character -> GetWorldTimerManager().SetTimer(
+		FireTimer,
+		this,
+		&UCombatComponent::FireTimerFinished,
+		EquippedWeapon->FireDelay
+	);
+}
+
+void UCombatComponent::FireTimerFinished()
+{
+	if (EquippedWeapon ==nullptr )
+	{
+		return;
+	}
+	bCanFire = true;
+	if (bFireButtonPressed && EquippedWeapon->bAutomatic)
+	{
+		Fire();
+	}
+}
+
+void UCombatComponent::Fire()
+{
+	if (bCanFire)
+	{
+		bCanFire = false;
+		//Server RPC
+		ServerFire(HitTarget);
+		if (EquippedWeapon)
+		{
+			CrosshairShootingFactor = 0.75f;
+		}
+		StartFireTimer();
+	}
+}
+
+//This is only executed on the Server side
+void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
+{
+	//This will make sure every Client will execute MulticastFire_Implementation
+	MulticastFire(TraceHitTarget);
+}
+
+// A multicast RPC called from the server is executed on the Server and all Clients
+void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
+{
+	if (EquippedWeapon==nullptr)
+	{
+		return;
+	}
+	if (Character)
+	{
+		Character->PlayFireMontage(bAiming);
+		EquippedWeapon->Fire(TraceHitTarget);
+	}
+}
+
+void UCombatComponent::TracerUnderCrosshairs(FHitResult& TraceHitResult)
+{
+	FVector2D ViewportSize;
+	if (GEngine && GEngine->GameViewport)
+	{
+		//Get coordinates of center of the screen in ScreenSpace
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+	}
+
+	FVector2D CrossHairLocation(ViewportSize.X / 2, ViewportSize.Y / 2);
+
+	// Turn ScreenSpace coordinates to WorldSpace position and direction
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+		UGameplayStatics::GetPlayerController(this, 0),
+		CrossHairLocation,
+		CrosshairWorldPosition,
+		CrosshairWorldDirection
+		);
+	if (bScreenToWorld)
+	{
+		FVector Start = CrosshairWorldPosition;
+
+		if (Character)
+		{
+			float DistanceToCharacter = (Character->GetActorLocation() - Start).Size();
+			Start += CrosshairWorldDirection * ( DistanceToCharacter + TraceOffsetFromCharacter );
+			if (bDrawShootingTraceStart)
+			{
+				DrawDebugSphere(GetWorld(), Start, 12.f, 12, FColor::Yellow);
+			}
+		}
+		
+		FVector End = Start + CrosshairWorldDirection  * TRACE_LENGTH;
+
+		GetWorld()->LineTraceSingleByChannel(
+			TraceHitResult,
+			Start,
+			End,
+			ECC_Visibility
+			);
+
+		if (!TraceHitResult.bBlockingHit)
+		{
+			TraceHitResult.ImpactPoint = End;
+		}
+	}
+	if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>())
+	{
+		HUDPackage.CrosshairsColor = FLinearColor::Red;
+	}
+	else
+	{
+		HUDPackage.CrosshairsColor = FLinearColor::White;
+	}
+}
+
+void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
+{
+	
+	if (Character == nullptr || WeaponToEquip == nullptr)
+	{
+		return;
+	}
+	
+	EquippedWeapon = WeaponToEquip;
+	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
+	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
+	if (HandSocket)
+	{
+		HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
+	}
+	EquippedWeapon->SetOwner(Character);
+	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+	Character->bUseControllerRotationYaw = true;
+}
+
+void UCombatComponent::OnRep_EquippedWeapon()
+{
+
+	if (EquippedWeapon && Character)
+	{
+		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
+		Character->bUseControllerRotationYaw = true;
 	}
 }
 
@@ -148,138 +314,6 @@ void UCombatComponent::InterpFOV(float DeltaTime)
 		Character->GetFollowCamera()->SetFieldOfView(CurrentFOV);
 	}
 }
-
-void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
-{
-	
-	if (Character == nullptr || WeaponToEquip == nullptr)
-	{
-		return;
-	}
-	
-	EquippedWeapon = WeaponToEquip;
-	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-	const USkeletalMeshSocket* HandSocket = Character->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-	if (HandSocket)
-	{
-		HandSocket->AttachActor(EquippedWeapon, Character->GetMesh());
-	}
-	EquippedWeapon->SetOwner(Character);
-	Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-	Character->bUseControllerRotationYaw = true;
-}
-void UCombatComponent::OnRep_EquippedWeapon()
-{
-
-	if (EquippedWeapon && Character)
-	{
-		Character->GetCharacterMovement()->bOrientRotationToMovement = false;
-		Character->bUseControllerRotationYaw = true;
-	}
-}
-
-// Can be called on both the Clients or the Server
-//( NB : but is only called on the character controller by the player on their machine,
-//not simulated proxies )
-void UCombatComponent::FireButtonPressed(bool bPressed)
-{
-	bFireButtonPressed = bPressed;
-
-	if(bFireButtonPressed)
-	{
-		FHitResult HitResult;
-		TracerUnderCrosshairs(HitResult);
-		
-		//Server RPC
-		ServerFire(HitResult.ImpactPoint);
-
-		if (EquippedWeapon)
-		{
-			CrosshairShootingFactor = 0.75f;
-		}
-	}
-}
-
-void UCombatComponent::TracerUnderCrosshairs(FHitResult& TraceHitResult)
-{
-	FVector2D ViewportSize;
-	if (GEngine && GEngine->GameViewport)
-	{
-		//Get coordinates of center of the screen in ScreenSpace
-		GEngine->GameViewport->GetViewportSize(ViewportSize);
-	}
-
-	FVector2D CrossHairLocation(ViewportSize.X / 2, ViewportSize.Y / 2);
-
-	// Turn ScreenSpace coordinates to WorldSpace position and direction
-	FVector CrosshairWorldPosition;
-	FVector CrosshairWorldDirection;
-	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
-		UGameplayStatics::GetPlayerController(this, 0),
-		CrossHairLocation,
-		CrosshairWorldPosition,
-		CrosshairWorldDirection
-		);
-	if (bScreenToWorld)
-	{
-		FVector Start = CrosshairWorldPosition;
-
-		if (Character)
-		{
-			float DistanceToCharacter = (Character->GetActorLocation() - Start).Size();
-			float OffsetFromCharacter = 25.f;
-			Start += CrosshairWorldDirection * ( DistanceToCharacter + OffsetFromCharacter );
-			//DrawDebugSphere(GetWorld(), Start, 12.f, 12, FColor::Yellow);
-		}
-		
-		FVector End = Start + CrosshairWorldDirection  * TRACE_LENGTH;
-
-		GetWorld()->LineTraceSingleByChannel(
-			TraceHitResult,
-			Start,
-			End,
-			ECC_Visibility
-			);
-
-		if (!TraceHitResult.bBlockingHit)
-		{
-			TraceHitResult.ImpactPoint = End;
-		}
-	}
-	if (TraceHitResult.GetActor() && TraceHitResult.GetActor()->Implements<UInteractWithCrosshairsInterface>())
-	{
-		HUDPackage.CrosshairsColor = FLinearColor::Red;
-	}
-	else
-	{
-		HUDPackage.CrosshairsColor = FLinearColor::White;
-	}
-}
-
-
-
-//This is only executed on the Server side
-void UCombatComponent::ServerFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
-{
-	//This will make sure every Client will execute MulticastFire_Implementation
-	MulticastFire(TraceHitTarget);
-}
-
-
-// A multicast RPC called from the server is executed on the Server and all Clients
-void UCombatComponent::MulticastFire_Implementation(const FVector_NetQuantize& TraceHitTarget)
-{
-	if (EquippedWeapon==nullptr)
-	{
-		return;
-	}
-	if (Character)
-	{
-		Character->PlayFireMontage(bAiming);
-		EquippedWeapon->Fire(TraceHitTarget);
-	}
-}
-
 
 void UCombatComponent::SetAiming(bool bIsAiming)
 {
