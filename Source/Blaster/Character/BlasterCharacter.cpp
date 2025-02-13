@@ -15,11 +15,20 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Net/UnrealNetwork.h"
 #include "Blaster/Blaster.h"
+#include "Blaster/GameMode/BlasterGameMode.h"
+#include "Blaster/PlayerController/BlasterPlayerController.h"
+#include "Blaster/PlayerState/BlasterPlayerState.h"
+#include "Kismet/GameplayStatics.h"
+#include "Microsoft/AllowMicrosoftPlatformTypes.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "Sound/SoundCue.h"
 
 ABlasterCharacter::ABlasterCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
+	
+	SpawnCollisionHandlingMethod = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 600.0f;
@@ -51,6 +60,8 @@ ABlasterCharacter::ABlasterCharacter()
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 	NetUpdateFrequency = 66.f;
 	MinNetUpdateFrequency = 33.f;
+
+	DissolveTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
 }
 
 
@@ -60,6 +71,7 @@ void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimePropert
 
 	//DOREPLIFETIME(ABlasterCharacter, OverlappingWeapon);
 	DOREPLIFETIME_CONDITION(ABlasterCharacter, OverlappingWeapon, COND_OwnerOnly);
+	DOREPLIFETIME(ABlasterCharacter, Health);
 }
 
 
@@ -70,18 +82,112 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 	TimeSinceLastMovementReplication = 0.f;
 }
 
+//Called only on the server
+void ABlasterCharacter::Elim()
+{
+	if (CombatComp && CombatComp->EquippedWeapon)
+	{
+		CombatComp->EquippedWeapon->Dropped();
+	}
+	MulticastElim();
+	GetWorldTimerManager().SetTimer(
+		ElimTimer,
+		this,
+		&ThisClass::ElimTimerFinished ,
+		ElimDelay
+		);
+}
+// Multicast called when a character is eliminated ( Called on Server AND Clients )
+void ABlasterCharacter::MulticastElim_Implementation()
+{
+	bElimmed = true;
+	PlayElimMontage();
+
+	// Start dissolve effect
+	if (DissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance = UMaterialInstanceDynamic::Create(DissolveMaterialInstance, this);
+
+		GetMesh()->SetMaterial(0, DynamicDissolveMaterialInstance);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue("Dissolve", 0.55f);
+		DynamicDissolveMaterialInstance->SetScalarParameterValue("Glow", 200.f);
+	}
+	StartDissolve();
+
+	// Disable character movement
+	GetCharacterMovement()->DisableMovement(); // prevent translation
+	GetCharacterMovement()->StopMovementImmediately(); // prevent rotation too
+	if ( BlasterPlayerController )
+	{
+		 DisableInput(BlasterPlayerController); // to prevent stuff like shooting the weapon
+	}
+
+	//Disable collision
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	//Spawn Elim bot
+	if (ElimBotEffect)
+	{
+		FVector ElimBotSpawnPoint(GetActorLocation().X,GetActorLocation().Y,GetActorLocation().Z + 200.f);
+		ElimBotComponent = UGameplayStatics::SpawnEmitterAtLocation(
+			GetWorld(),
+			ElimBotEffect,
+			ElimBotSpawnPoint,
+			GetActorRotation()
+		);
+	}
+	if (ElimBotSound)
+	{
+		UGameplayStatics::SpawnSoundAtLocation(
+			this,
+			ElimBotSound,
+			GetActorLocation()
+			);
+	}
+}
+
+//Only called on the server
+void ABlasterCharacter::ElimTimerFinished()
+{
+	ABlasterGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABlasterGameMode>();
+	if (BlasterGameMode)
+	{
+		BlasterGameMode->RequestRespawn(this, Controller);
+	}
+}
+
+
+void ABlasterCharacter::Destroyed()
+{
+	Super::Destroyed();
+	if (ElimBotComponent)
+	{
+		ElimBotComponent->DestroyComponent();
+	}
+}
+
 void ABlasterCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//Assigns CharacterMappingContext to this Character
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	BlasterPlayerController = Cast<ABlasterPlayerController>(GetController());
+	if (BlasterPlayerController)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		//Assigns CharacterMappingContext to this Character
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(BlasterPlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(CharacterMappingContext, 0);
 		}
 	}
+	UpdateHUDHealth();
+	
+	if (HasAuthority())
+	{
+		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
+	}
+
+
 }
 
 void ABlasterCharacter::Tick(float DeltaTime)
@@ -106,6 +212,7 @@ void ABlasterCharacter::Tick(float DeltaTime)
 	}
 	
 	HideCharacterIfCameraClose();
+	PollInit();
 }
 
 void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -152,6 +259,15 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 		AnimInstance->Montage_Play(FireWeaponMontage);
 		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
 		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+void ABlasterCharacter::PlayElimMontage()
+{
+	
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ElimMontage)
+	{
+		AnimInstance->Montage_Play(ElimMontage);
 	}
 }
 
@@ -276,11 +392,6 @@ void ABlasterCharacter::FireButtonPressed(const FInputActionValue& Value)
 
 #pragma endregion Inputs Callbacks
 
-void ABlasterCharacter::MulticastHit_Implementation()
-{
-	PlayHitReactMontage();
-}
-
 void ABlasterCharacter::HideCharacterIfCameraClose()
 {
 	if (!IsLocallyControlled())
@@ -306,6 +417,58 @@ void ABlasterCharacter::HideCharacterIfCameraClose()
 	}
 }
 
+//Only called on Clients
+void ABlasterCharacter::OnRep_Health()
+{
+	UpdateHUDHealth();
+	    if (!bElimmed)
+        {
+			PlayHitReactMontage();
+        }
+}
+
+void ABlasterCharacter::UpdateHUDHealth()
+{
+	BlasterPlayerController = (BlasterPlayerController==nullptr) ? Cast<ABlasterPlayerController>(GetController()): BlasterPlayerController;
+
+	if (BlasterPlayerController)
+	{
+		BlasterPlayerController->SetHUDHealth(Health, MaxHealth);
+	}
+}
+
+void ABlasterCharacter::PollInit()
+{
+	if ( BlasterPlayerState == nullptr )
+	{
+		BlasterPlayerState = GetPlayerState<ABlasterPlayerState>();
+		if (BlasterPlayerState)
+		{
+			BlasterPlayerState->AddToScore(0.f); //Update the Score UI
+			BlasterPlayerState->AddToDefeats(0); //Update the Defeats UI
+		}
+	}
+}
+
+
+void ABlasterCharacter::StartDissolve()
+{
+	DissolveTrack.BindDynamic(this, &ThisClass::ABlasterCharacter::UpdateDissolveMaterial);
+	if (DissolveCurve && DissolveTimeline)
+	{
+		DissolveTimeline->AddInterpFloat(DissolveCurve, DissolveTrack);
+		DissolveTimeline->Play();
+	}
+}
+
+
+void ABlasterCharacter::UpdateDissolveMaterial(float DissolveValue)
+{
+	if (DynamicDissolveMaterialInstance)
+	{
+		DynamicDissolveMaterialInstance->SetScalarParameterValue("Dissolve", DissolveValue);
+	}
+}
 
 void ABlasterCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
@@ -435,7 +598,6 @@ void ABlasterCharacter::SimProxiesTurn()
 	ProxyRotation = GetActorRotation();
 	ProxyYaw = UKismetMathLibrary::NormalizedDeltaRotator(ProxyRotation, ProxyRotationLastFrame).Yaw;
 	
-	UE_LOG(LogTemp, Warning, TEXT("ProxyYaw: %f"), ProxyYaw);
 	if (FMath::Abs(ProxyYaw) > TurnThreshold)
 	{
 		if (ProxyYaw > TurnThreshold)
@@ -454,6 +616,28 @@ void ABlasterCharacter::SimProxiesTurn()
 	}
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 }
+
+//Only called on the Server
+void ABlasterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType,
+	class AController* InstigatorController, AActor* DamageCauser)
+{
+	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
+	UpdateHUDHealth();
+	PlayHitReactMontage();
+
+	if (Health == 0.f)
+	{
+		ABlasterGameMode* BlasterGameMode = GetWorld()->GetAuthGameMode<ABlasterGameMode>();
+		if (BlasterGameMode)
+		{
+			BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+			ABlasterPlayerController* AttackerController = Cast<ABlasterPlayerController>(InstigatorController);
+			BlasterGameMode->PlayerEliminated(this, BlasterPlayerController, AttackerController);
+		}
+	}
+}
+
+
 
 
 void ABlasterCharacter::TurnInPlace(float DeltaTime)
