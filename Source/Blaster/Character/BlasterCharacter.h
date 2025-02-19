@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "Blaster/BlasterTypes/TurningInPlace.h"
+#include "Blaster/BlasterTypes/CombatState.h"
 #include "Blaster/Interfaces/InteractWithCrosshairsInterface.h"
 #include "Components/TimelineComponent.h"
 #include "BlasterCharacter.generated.h"
@@ -21,10 +22,12 @@ class BLASTER_API ABlasterCharacter : public ACharacter, public IInteractWithCro
 public:
 	ABlasterCharacter();
 	virtual void Tick(float DeltaTime) override;
+	virtual void PossessedBy(AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PostInitializeComponents() override;
 	void PlayFireMontage(bool bAiming);
+	void PlayReloadMontage();
 	void PlayElimMontage();
 	virtual void OnRep_ReplicatedMovement() override;
 
@@ -32,6 +35,9 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastElim();
 	virtual void Destroyed() override;
+	
+	UPROPERTY(Replicated)
+	bool bDisableGameplay = false;
 protected:
 	virtual void BeginPlay() override;
 
@@ -56,6 +62,8 @@ protected:
 	UInputAction* AimAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
 	UInputAction* FireAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
+	UInputAction* ReloadAction;
 	
 	void MoveForward(const FInputActionValue& Value);
 	void MoveRight(const FInputActionValue& Value);
@@ -65,6 +73,7 @@ protected:
 	void CrouchButtonPressed(const FInputActionValue& Value);
 	void AimButtonPressed(const FInputActionValue& Value);
 	void FireButtonPressed(const FInputActionValue& Value);
+	void ReloadButtonPressed(const FInputActionValue& Value);
 	virtual void Jump() override;
 
 	void AimOffset(float DeltaTime);
@@ -76,6 +85,8 @@ protected:
 	// Poll for any relevant classes and initialize our HUD
 	// ( ie. try every frame to init important null variables, that are not necessarely init synchronously with Character class)
 	void PollInit();
+	void RotateInPlace(float DeltaTime);
+
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class USpringArmComponent* CameraBoom;
@@ -92,12 +103,14 @@ private:
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UCombatComponent* CombatComp;
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
 
+	void AddInputMappingContextToPlayer();
+	
 	float AO_Yaw;
 	float InterpAO_Yaw;
 	float AO_Pitch;
@@ -106,15 +119,23 @@ private:
 	ETurningInPlace TurningInPlace;
 	void TurnInPlace(float DeltaTime);
 
+	/**
+	 * Animation montages
+	 */
+	
 	UPROPERTY(EditAnywhere, Category = Combat)
 	class UAnimMontage* FireWeaponMontage;
 
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* ReloadMontage;
+	
 	UPROPERTY(EditAnywhere, Category = Combat)
 	UAnimMontage* HitReactMontage;
 	void PlayHitReactMontage();
 
 	UPROPERTY(EditAnywhere, Category = Combat)
 	UAnimMontage* ElimMontage;
+	
 	
 	void HideCharacterIfCameraClose();
 	UPROPERTY(EditAnywhere)
@@ -210,6 +231,10 @@ public:
 	FORCEINLINE float GetHealth() const { return Health; }
 	FORCEINLINE float GetMaxHealth() const { return MaxHealth; }
 
+	ECombatState GetCombatState() const;
+
+	FORCEINLINE UCombatComponent* GetCombat() const { return CombatComp; }
+	FORCEINLINE bool GetDisableGameplay() const { return bDisableGameplay; }
 };
 
 

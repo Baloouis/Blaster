@@ -8,8 +8,7 @@
 void AProjectileWeapon::Fire(const FVector& HitTarget)
 {
 	Super::Fire(HitTarget);
-
-
+	
 	if (!HasAuthority())
 	{
 		return;

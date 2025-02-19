@@ -72,6 +72,7 @@ void ABlasterCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimePropert
 	//DOREPLIFETIME(ABlasterCharacter, OverlappingWeapon);
 	DOREPLIFETIME_CONDITION(ABlasterCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(ABlasterCharacter, Health);
+	DOREPLIFETIME(ABlasterCharacter, bDisableGameplay);
 }
 
 
@@ -100,6 +101,10 @@ void ABlasterCharacter::Elim()
 // Multicast called when a character is eliminated ( Called on Server AND Clients )
 void ABlasterCharacter::MulticastElim_Implementation()
 {
+	if (BlasterPlayerController)
+	{
+		BlasterPlayerController->SetHUDWeaponAmmo(0);
+	}
 	bElimmed = true;
 	PlayElimMontage();
 
@@ -115,11 +120,10 @@ void ABlasterCharacter::MulticastElim_Implementation()
 	StartDissolve();
 
 	// Disable character movement
-	GetCharacterMovement()->DisableMovement(); // prevent translation
-	GetCharacterMovement()->StopMovementImmediately(); // prevent rotation too
-	if ( BlasterPlayerController )
+	bDisableGameplay = true;
+	if (CombatComp)
 	{
-		 DisableInput(BlasterPlayerController); // to prevent stuff like shooting the weapon
+		CombatComp->FireButtonPressed(false);
 	}
 
 	//Disable collision
@@ -165,6 +169,13 @@ void ABlasterCharacter::Destroyed()
 	{
 		ElimBotComponent->DestroyComponent();
 	}
+	
+	ABlasterGameMode* BlasterGameMode = Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this));
+	bool bMatchNotInProgress = BlasterGameMode && BlasterGameMode->GetMatchState() != MatchState::InProgress;
+	if (CombatComp && CombatComp->EquippedWeapon && bMatchNotInProgress)
+	{
+		CombatComp->EquippedWeapon->Destroy();
+	}
 }
 
 void ABlasterCharacter::BeginPlay()
@@ -172,49 +183,56 @@ void ABlasterCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	BlasterPlayerController = Cast<ABlasterPlayerController>(GetController());
-	if (BlasterPlayerController)
-	{
-		//Assigns CharacterMappingContext to this Character
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(BlasterPlayerController->GetLocalPlayer()))
-		{
-			Subsystem->AddMappingContext(CharacterMappingContext, 0);
-		}
-	}
+	
+	AddInputMappingContextToPlayer();
+	
 	UpdateHUDHealth();
 	
 	if (HasAuthority())
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
+}
 
-
+void ABlasterCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+ 
+	AddInputMappingContextToPlayer();
 }
 
 void ABlasterCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	//AimOffset(DeltaTime);
-
-	//if we're not a simulated proxy
-	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
-	{
-		AimOffset(DeltaTime);
-	}
-	else
-	{
-		TimeSinceLastMovementReplication += DeltaTime;
-		if (TimeSinceLastMovementReplication > 0.25f)
-		{
-			OnRep_ReplicatedMovement();
-		}
-		CalculateAO_Pitch();
-	}
-	
+	RotateInPlace(DeltaTime);
 	HideCharacterIfCameraClose();
 	PollInit();
 }
 
+void ABlasterCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	if (CombatComp)
+	{
+		CombatComp->Character = this;
+	}
+}
+
+#pragma region Inputs Init
+
+void ABlasterCharacter::AddInputMappingContextToPlayer()
+{
+	// Not using BlasterPlayerController for setting inputs as it will be nullptr in Lobby level where the PlayerController class is not overriden by ABlasterPlayerController
+	if (APlayerController* InputPlayerController = Cast<APlayerController>(GetController()))
+	{
+		//Assigns CharacterMappingContext to this Character
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(InputPlayerController->GetLocalPlayer()))
+		{
+			Subsystem->AddMappingContext(CharacterMappingContext, 0);
+		}
+	}
+}
 void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
@@ -234,18 +252,12 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Triggered , this, &ThisClass::CrouchButtonPressed);
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Triggered , this, &ThisClass::AimButtonPressed);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered , this, &ThisClass::FireButtonPressed);
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered , this, &ThisClass::ReloadButtonPressed);
 		
 		
 	}
 }
-void ABlasterCharacter::PostInitializeComponents()
-{
-	Super::PostInitializeComponents();
-	if (CombatComp)
-	{
-		CombatComp->Character = this;
-	}
-}
+#pragma endregion Inputs Init
 
 void ABlasterCharacter::PlayFireMontage(bool bAiming)
 {
@@ -258,6 +270,25 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 	{
 		AnimInstance->Montage_Play(FireWeaponMontage);
 		FName SectionName = bAiming ? FName("RifleAim") : FName("RifleHip");
+		AnimInstance->Montage_JumpToSection(SectionName);
+	}
+}
+
+void ABlasterCharacter::PlayReloadMontage()
+{
+	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr) return;
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ReloadMontage)
+	{
+		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
+		
+		switch (CombatComp->EquippedWeapon->GetWeaponType())
+		{
+		case EWeaponType::EWT_AssaultRifle:
+			SectionName = FName("Rifle");
+			break;
+		}
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
@@ -285,10 +316,36 @@ void ABlasterCharacter::PlayHitReactMontage()
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
-
+void ABlasterCharacter::RotateInPlace(float DeltaTime)
+{
+	if (bDisableGameplay)
+	{
+		bUseControllerRotationYaw = false;
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+		return;
+	}
+	//if we're not a simulated proxy
+	if (GetLocalRole() > ROLE_SimulatedProxy && IsLocallyControlled())
+	{
+		AimOffset(DeltaTime);
+	}
+	else
+	{
+		TimeSinceLastMovementReplication += DeltaTime;
+		if (TimeSinceLastMovementReplication > 0.25f)
+		{
+			OnRep_ReplicatedMovement();
+		}
+		CalculateAO_Pitch();
+	}
+	
+	HideCharacterIfCameraClose();
+	PollInit();
+}
 #pragma region Inputs Callbacks
 void ABlasterCharacter::MoveForward(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	float FloatValue = Value.Get<float>();
 
 	if (Controller != nullptr && FloatValue != 0.f)
@@ -302,6 +359,7 @@ void ABlasterCharacter::MoveForward(const FInputActionValue& Value)
 
 void ABlasterCharacter::MoveRight(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	float FloatValue = Value.Get<float>();
 
 	if (Controller != nullptr && FloatValue != 0.f)
@@ -327,6 +385,7 @@ void ABlasterCharacter::LookUp(const FInputActionValue& Value)
 
 void ABlasterCharacter::Jump()
 {
+	if (bDisableGameplay) return;
 	if (bIsCrouched)
 	{
 		UnCrouch();
@@ -341,6 +400,7 @@ void ABlasterCharacter::Jump()
 
 void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComp)
 	{
 		if (HasAuthority()) // We're on the Server
@@ -356,6 +416,7 @@ void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
+	if (bDisableGameplay) return;
 	if (CombatComp)
 	{
 		CombatComp->EquipWeapon(OverlappingWeapon);
@@ -364,6 +425,7 @@ void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 
 void ABlasterCharacter::CrouchButtonPressed(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (bIsCrouched)
 	{
 		UnCrouch();
@@ -376,6 +438,7 @@ void ABlasterCharacter::CrouchButtonPressed(const FInputActionValue& Value)
 
 void ABlasterCharacter::AimButtonPressed(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComp)
 	{
 		CombatComp->SetAiming(Value.Get<bool>());
@@ -384,9 +447,19 @@ void ABlasterCharacter::AimButtonPressed(const FInputActionValue& Value)
 
 void ABlasterCharacter::FireButtonPressed(const FInputActionValue& Value)
 {
+	if (bDisableGameplay) return;
 	if (CombatComp)
 	{
 		CombatComp->FireButtonPressed(Value.Get<bool>());
+	}
+}
+
+void ABlasterCharacter::ReloadButtonPressed(const FInputActionValue& Value)
+{
+	if (bDisableGameplay) return;
+	if (CombatComp)
+	{
+		CombatComp->Reload();
 	}
 }
 
@@ -420,16 +493,17 @@ void ABlasterCharacter::HideCharacterIfCameraClose()
 //Only called on Clients
 void ABlasterCharacter::OnRep_Health()
 {
+	UE_LOG(LogTemp, Warning, TEXT("OnRep_Health()"));
 	UpdateHUDHealth();
-	    if (!bElimmed)
-        {
-			PlayHitReactMontage();
-        }
+    if (!bElimmed)
+    {
+		PlayHitReactMontage();
+    }
 }
 
 void ABlasterCharacter::UpdateHUDHealth()
 {
-	BlasterPlayerController = (BlasterPlayerController==nullptr) ? Cast<ABlasterPlayerController>(GetController()): BlasterPlayerController;
+	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
 
 	if (BlasterPlayerController)
 	{
@@ -469,19 +543,15 @@ void ABlasterCharacter::UpdateDissolveMaterial(float DissolveValue)
 		DynamicDissolveMaterialInstance->SetScalarParameterValue("Dissolve", DissolveValue);
 	}
 }
-
 void ABlasterCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
-	if(IsLocallyControlled())
+	if (OverlappingWeapon)
 	{
-		if (OverlappingWeapon)
-		{
-			OverlappingWeapon->ShowPickupWidget(false);
-		}
+		OverlappingWeapon->ShowPickupWidget(false);
 	}
 	OverlappingWeapon = Weapon;
 	//To handle the case for when the BlasterCharacter controlled by the Server is Overlapping ( so there not Replication called )
-	if(IsLocallyControlled())
+	if (IsLocallyControlled())
 	{
 		if (OverlappingWeapon)
 		{
@@ -489,7 +559,6 @@ void ABlasterCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 		}
 	}
 }
-
 void ABlasterCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 {
 	if (OverlappingWeapon)
@@ -672,4 +741,10 @@ FVector ABlasterCharacter::GetHitTarget() const
 		return FVector();
 	}
 	return CombatComp->HitTarget;
+}
+
+ECombatState ABlasterCharacter::GetCombatState() const
+{
+	if (CombatComp == nullptr) return ECombatState::ECS_MAX;
+	return CombatComp->CombatState;
 }
