@@ -34,6 +34,9 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	void SetHUDTime();
+	UPROPERTY(EditAnywhere, Category = Time)
+	int StartThresholdBlinkingCountdownAnim = 10;
+	
 	void PollInit();
 
 	/** 

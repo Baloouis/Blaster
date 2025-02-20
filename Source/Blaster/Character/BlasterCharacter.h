@@ -38,6 +38,10 @@ public:
 	
 	UPROPERTY(Replicated)
 	bool bDisableGameplay = false;
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void ShowSniperScopeWidget(bool bShowScope);
+	
 protected:
 	virtual void BeginPlay() override;
 
@@ -64,6 +68,8 @@ protected:
 	UInputAction* FireAction;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
 	UInputAction* ReloadAction;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input	)
+	UInputAction* DashAction;
 	
 	void MoveForward(const FInputActionValue& Value);
 	void MoveRight(const FInputActionValue& Value);
@@ -75,10 +81,18 @@ protected:
 	void FireButtonPressed(const FInputActionValue& Value);
 	void ReloadButtonPressed(const FInputActionValue& Value);
 	virtual void Jump() override;
+	void DashButtonPressed(const FInputActionValue& Value);
 
 	void AimOffset(float DeltaTime);
 	void SimProxiesTurn();
+
 	
+	UPROPERTY(EditAnywhere, Category= Dash)
+	float DashForce = 1.f;
+	UPROPERTY(EditAnywhere, Category= Dash)
+	float DashDelay = 1.f;
+	void DashTimerFinished();
+
 	UFUNCTION()
 	void ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
 	void UpdateHUDHealth();
@@ -87,6 +101,7 @@ protected:
 	void PollInit();
 	void RotateInPlace(float DeltaTime);
 
+	
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class USpringArmComponent* CameraBoom;
@@ -104,7 +119,7 @@ private:
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
-	class UCombatComponent* CombatComp;
+	class UCombatComponent* CombatComponent;
 
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
@@ -119,6 +134,10 @@ private:
 	ETurningInPlace TurningInPlace;
 	void TurnInPlace(float DeltaTime);
 
+	bool bPreventDash;
+	FTimerHandle DashTimer;
+
+	
 	/**
 	 * Animation montages
 	 */
@@ -233,7 +252,7 @@ public:
 
 	ECombatState GetCombatState() const;
 
-	FORCEINLINE UCombatComponent* GetCombat() const { return CombatComp; }
+	FORCEINLINE UCombatComponent* GetCombat() const { return CombatComponent; }
 	FORCEINLINE bool GetDisableGameplay() const { return bDisableGameplay; }
 };
 

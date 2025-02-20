@@ -44,8 +44,8 @@ ABlasterCharacter::ABlasterCharacter()
 	OverheadWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
 	OverheadWidget -> SetupAttachment(RootComponent);
 
-	CombatComp = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
-	CombatComp->SetIsReplicated(true);
+	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
+	CombatComponent->SetIsReplicated(true);
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
@@ -54,7 +54,7 @@ ABlasterCharacter::ABlasterCharacter()
 	//Prevent characters from blocking the camera of other players
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
 	GetMesh()->SetCollisionResponseToChannel(ECC_Camera,ECR_Ignore);
-	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
+	GetMesh()->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);     
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 0.0f, 850.0f);
 
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
@@ -62,6 +62,9 @@ ABlasterCharacter::ABlasterCharacter()
 	MinNetUpdateFrequency = 33.f;
 
 	DissolveTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("DissolveTimelineComponent"));
+
+	//To make sure the character's bones are updated even when the client character is not in the server's view, to make sure the muzzle position is correct. 
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 }
 
 
@@ -86,9 +89,9 @@ void ABlasterCharacter::OnRep_ReplicatedMovement()
 //Called only on the server
 void ABlasterCharacter::Elim()
 {
-	if (CombatComp && CombatComp->EquippedWeapon)
+	if (CombatComponent && CombatComponent->EquippedWeapon)
 	{
-		CombatComp->EquippedWeapon->Dropped();
+		CombatComponent->EquippedWeapon->Dropped();
 	}
 	MulticastElim();
 	GetWorldTimerManager().SetTimer(
@@ -121,9 +124,11 @@ void ABlasterCharacter::MulticastElim_Implementation()
 
 	// Disable character movement
 	bDisableGameplay = true;
-	if (CombatComp)
+	GetCharacterMovement()->DisableMovement();
+	
+	if (CombatComponent)
 	{
-		CombatComp->FireButtonPressed(false);
+		CombatComponent->FireButtonPressed(false);
 	}
 
 	//Disable collision
@@ -149,6 +154,12 @@ void ABlasterCharacter::MulticastElim_Implementation()
 			GetActorLocation()
 			);
 	}
+	bool bHideSniperScope = IsLocallyControlled() && CombatComponent && CombatComponent->EquippedWeapon && CombatComponent->EquippedWeapon->GetWeaponType()==EWeaponType::EWT_SniperRifle;
+	//To prevent sniper aim UI / widget being visible at respawn
+	if (bHideSniperScope)
+	{
+		ShowSniperScopeWidget(false);
+	}
 }
 
 //Only called on the server
@@ -172,9 +183,9 @@ void ABlasterCharacter::Destroyed()
 	
 	ABlasterGameMode* BlasterGameMode = Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this));
 	bool bMatchNotInProgress = BlasterGameMode && BlasterGameMode->GetMatchState() != MatchState::InProgress;
-	if (CombatComp && CombatComp->EquippedWeapon && bMatchNotInProgress)
+	if (CombatComponent && CombatComponent->EquippedWeapon && bMatchNotInProgress)
 	{
-		CombatComp->EquippedWeapon->Destroy();
+		CombatComponent->EquippedWeapon->Destroy();
 	}
 }
 
@@ -213,9 +224,9 @@ void ABlasterCharacter::Tick(float DeltaTime)
 void ABlasterCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if (CombatComp)
+	if (CombatComponent)
 	{
-		CombatComp->Character = this;
+		CombatComponent->Character = this;
 	}
 }
 
@@ -253,15 +264,14 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Triggered , this, &ThisClass::AimButtonPressed);
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered , this, &ThisClass::FireButtonPressed);
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered , this, &ThisClass::ReloadButtonPressed);
-		
-		
+		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered , this, &ThisClass::DashButtonPressed);
 	}
 }
 #pragma endregion Inputs Init
 
 void ABlasterCharacter::PlayFireMontage(bool bAiming)
 {
-	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr)
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr)
 	{
 		return;
 	}
@@ -276,16 +286,31 @@ void ABlasterCharacter::PlayFireMontage(bool bAiming)
 
 void ABlasterCharacter::PlayReloadMontage()
 {
-	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr) return;
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr) return;
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if (AnimInstance && ReloadMontage)
 	{
 		AnimInstance->Montage_Play(ReloadMontage);
 		FName SectionName;
 		
-		switch (CombatComp->EquippedWeapon->GetWeaponType())
+		switch (CombatComponent->EquippedWeapon->GetWeaponType())
 		{
 		case EWeaponType::EWT_AssaultRifle:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_RocketLauncher:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_Pistol:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_SubmachineGun:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_SniperRifle:
+			SectionName = FName("Rifle");
+			break;
+		case EWeaponType::EWT_GrenadeLauncher:
 			SectionName = FName("Rifle");
 			break;
 		}
@@ -304,7 +329,7 @@ void ABlasterCharacter::PlayElimMontage()
 
 void ABlasterCharacter::PlayHitReactMontage()
 {
-	if (CombatComp == nullptr || CombatComp->EquippedWeapon == nullptr)
+	if (CombatComponent == nullptr || CombatComponent->EquippedWeapon == nullptr)
 	{
 		return;
 	}
@@ -396,16 +421,37 @@ void ABlasterCharacter::Jump()
 	}
 }
 
+void ABlasterCharacter::DashButtonPressed(const FInputActionValue& Value)
+{
+	if (bPreventDash)
+	{
+		return;
+	}
+	//GetLastMovementInputVector();
+	LaunchCharacter(GetVelocity().GetSafeNormal() * DashForce,false,false);
+	bPreventDash = true;
 
+	//Start Dash delay Timer
+	GetWorldTimerManager().SetTimer(
+		DashTimer,
+		this,
+		&ThisClass::DashTimerFinished,
+		DashDelay
+	);
+}
+void ABlasterCharacter::DashTimerFinished()
+{
+	bPreventDash = false;
+}
 
 void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 {
 	if (bDisableGameplay) return;
-	if (CombatComp)
+	if (CombatComponent)
 	{
 		if (HasAuthority()) // We're on the Server
 		{
-			CombatComp->EquipWeapon(OverlappingWeapon);
+			CombatComponent->EquipWeapon(OverlappingWeapon);
 		}
 		else // We're on a Client
 		{
@@ -417,9 +463,9 @@ void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 {
 	if (bDisableGameplay) return;
-	if (CombatComp)
+	if (CombatComponent)
 	{
-		CombatComp->EquipWeapon(OverlappingWeapon);
+		CombatComponent->EquipWeapon(OverlappingWeapon);
 	}
 }
 
@@ -439,27 +485,27 @@ void ABlasterCharacter::CrouchButtonPressed(const FInputActionValue& Value)
 void ABlasterCharacter::AimButtonPressed(const FInputActionValue& Value)
 {
 	if (bDisableGameplay) return;
-	if (CombatComp)
+	if (CombatComponent)
 	{
-		CombatComp->SetAiming(Value.Get<bool>());
+		CombatComponent->SetAiming(Value.Get<bool>());
 	}
 }
 
 void ABlasterCharacter::FireButtonPressed(const FInputActionValue& Value)
 {
 	if (bDisableGameplay) return;
-	if (CombatComp)
+	if (CombatComponent)
 	{
-		CombatComp->FireButtonPressed(Value.Get<bool>());
+		CombatComponent->FireButtonPressed(Value.Get<bool>());
 	}
 }
 
 void ABlasterCharacter::ReloadButtonPressed(const FInputActionValue& Value)
 {
 	if (bDisableGameplay) return;
-	if (CombatComp)
+	if (CombatComponent)
 	{
-		CombatComp->Reload();
+		CombatComponent->Reload();
 	}
 }
 
@@ -475,17 +521,17 @@ void ABlasterCharacter::HideCharacterIfCameraClose()
 	if ((FollowCamera->GetComponentLocation() - GetActorLocation()).Size() < CameraHideCharacterThreshold)
 	{
 		GetMesh()->SetVisibility(false);
-		if (CombatComp && CombatComp->EquippedWeapon && CombatComp->EquippedWeapon->GetWeaponMesh())
+		if (CombatComponent && CombatComponent->EquippedWeapon && CombatComponent->EquippedWeapon->GetWeaponMesh())
 		{
-			CombatComp->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = true;
+			CombatComponent->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = true;
 		}
 	}
 	else
 	{
 		GetMesh()->SetVisibility(true);
-		if (CombatComp && CombatComp->EquippedWeapon && CombatComp->EquippedWeapon->GetWeaponMesh())
+		if (CombatComponent && CombatComponent->EquippedWeapon && CombatComponent->EquippedWeapon->GetWeaponMesh())
 		{
-			CombatComp->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = false;
+			CombatComponent->EquippedWeapon->GetWeaponMesh()->bOwnerNoSee = false;
 		}
 	}
 }
@@ -574,23 +620,23 @@ void ABlasterCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
 bool ABlasterCharacter::IsWeaponEquipped()
 {
 
-	bool bRes = (CombatComp && CombatComp->EquippedWeapon);
+	bool bRes = (CombatComponent && CombatComponent->EquippedWeapon);
 
 	return bRes;
 }
 
 bool ABlasterCharacter::IsAiming()
 {
-	return (CombatComp && CombatComp->bAiming);
+	return (CombatComponent && CombatComponent->bAiming);
 }
 
 AWeapon* ABlasterCharacter::GetEquippedWeapon() const
 {
-	if ( CombatComp == nullptr )
+	if ( CombatComponent == nullptr )
 	{
 		return nullptr;
 	}
-	return CombatComp->EquippedWeapon;
+	return CombatComponent->EquippedWeapon;
 }
 
 float ABlasterCharacter::CalculateSpeed()
@@ -602,7 +648,7 @@ float ABlasterCharacter::CalculateSpeed()
 
 void ABlasterCharacter::AimOffset(float DeltaTime)
 {
-	if (CombatComp && CombatComp->EquippedWeapon == nullptr)
+	if (CombatComponent && CombatComponent->EquippedWeapon == nullptr)
 	{
 		return;
 	}
@@ -651,7 +697,7 @@ void ABlasterCharacter::CalculateAO_Pitch()
 }
 void ABlasterCharacter::SimProxiesTurn()
 {
-	if (CombatComp == nullptr && CombatComp->EquippedWeapon == nullptr)
+	if (CombatComponent == nullptr && CombatComponent->EquippedWeapon == nullptr)
 	{
 		return;
 	}
@@ -736,15 +782,15 @@ void ABlasterCharacter::TurnInPlace(float DeltaTime)
 
 FVector ABlasterCharacter::GetHitTarget() const
 {
-	if (CombatComp == nullptr)
+	if (CombatComponent == nullptr)
 	{
 		return FVector();
 	}
-	return CombatComp->HitTarget;
+	return CombatComponent->HitTarget;
 }
 
 ECombatState ABlasterCharacter::GetCombatState() const
 {
-	if (CombatComp == nullptr) return ECombatState::ECS_MAX;
-	return CombatComp->CombatState;
+	if (CombatComponent == nullptr) return ECombatState::ECS_MAX;
+	return CombatComponent->CombatState;
 }
