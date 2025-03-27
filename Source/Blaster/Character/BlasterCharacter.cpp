@@ -8,6 +8,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "Blaster/BlasterComponents/CombatComponent.h"
+#include "Blaster/BlasterComponents/BuffComponent.h"
 #include "Blaster/Weapon/Weapon.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/WidgetComponent.h"
@@ -47,6 +48,9 @@ ABlasterCharacter::ABlasterCharacter()
 	CombatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent"));
 	CombatComponent->SetIsReplicated(true);
 
+	Buff = CreateDefaultSubobject<UBuffComponent>(TEXT("BuffComponent"));
+	Buff->SetIsReplicated(true);
+	
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
 	//Set collision type to custom collision channel
@@ -65,6 +69,11 @@ ABlasterCharacter::ABlasterCharacter()
 
 	//To make sure the character's bones are updated even when the client character is not in the server's view, to make sure the muzzle position is correct. 
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+
+
+	AttachedGrenade = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Attached Grenade"));
+	AttachedGrenade->SetupAttachment(GetMesh(), FName("GrenadeSocket"));
+	AttachedGrenade->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
 
@@ -203,6 +212,10 @@ void ABlasterCharacter::BeginPlay()
 	{
 		OnTakeAnyDamage.AddDynamic(this, &ThisClass::ReceiveDamage);
 	}
+	if (AttachedGrenade)
+	{
+		AttachedGrenade->SetVisibility(false);
+	}
 }
 
 void ABlasterCharacter::PossessedBy(AController* NewController)
@@ -227,6 +240,10 @@ void ABlasterCharacter::PostInitializeComponents()
 	if (CombatComponent)
 	{
 		CombatComponent->Character = this;
+	}
+	if (Buff)
+	{
+		Buff->Character = this;
 	}
 }
 
@@ -265,6 +282,7 @@ void ABlasterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered , this, &ThisClass::FireButtonPressed);
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered , this, &ThisClass::ReloadButtonPressed);
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Triggered , this, &ThisClass::DashButtonPressed);
+		EnhancedInputComponent->BindAction(ThrowGrenadeAction, ETriggerEvent::Triggered , this, &ThisClass::GrenadeButtonPressed);
 	}
 }
 #pragma endregion Inputs Init
@@ -327,6 +345,15 @@ void ABlasterCharacter::PlayElimMontage()
 	if (AnimInstance && ElimMontage)
 	{
 		AnimInstance->Montage_Play(ElimMontage);
+	}
+}
+
+void ABlasterCharacter::PlayThrowGrenadeMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && ThrowGrenadeMontage)
+	{
+		AnimInstance->Montage_Play(ThrowGrenadeMontage);
 	}
 }
 
@@ -442,6 +469,15 @@ void ABlasterCharacter::DashButtonPressed(const FInputActionValue& Value)
 		DashDelay
 	);
 }
+
+void ABlasterCharacter::GrenadeButtonPressed()
+{
+	if (CombatComponent)
+	{
+		CombatComponent->ThrowGrenade();
+	}
+}
+
 void ABlasterCharacter::DashTimerFinished()
 {
 	bPreventDash = false;
@@ -540,14 +576,14 @@ void ABlasterCharacter::HideCharacterIfCameraClose()
 }
 
 //Only called on Clients
-void ABlasterCharacter::OnRep_Health()
+void ABlasterCharacter::OnRep_Health(float LastHealth)
 {
 	UE_LOG(LogTemp, Warning, TEXT("OnRep_Health()"));
 	UpdateHUDHealth();
-    if (!bElimmed)
-    {
+	if (!bElimmed && Health < LastHealth)
+	{
 		PlayHitReactMontage();
-    }
+	}
 }
 
 void ABlasterCharacter::UpdateHUDHealth()
@@ -739,6 +775,7 @@ void ABlasterCharacter::SimProxiesTurn()
 void ABlasterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType,
 	class AController* InstigatorController, AActor* DamageCauser)
 {
+	if (bElimmed) return;
 	Health = FMath::Clamp(Health - Damage, 0.f, MaxHealth);
 	UpdateHUDHealth();
 	PlayHitReactMontage();

@@ -98,6 +98,7 @@ void ABlasterGameMode::RequestRespawn(ACharacter* ElimmedCharacter, AController*
 	if (ElimmedController)
 	{
 		TArray<AActor*> PlayerStarts;
+		UE_LOG(LogTemp, Warning, TEXT("ElimmedController valid"))
 		UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(),PlayerStarts);
 		int32 Selection = FMath::RandRange(0, PlayerStarts.Num() - 1);
 		RestartPlayerAtPlayerStart(ElimmedController, PlayerStarts[Selection]);
