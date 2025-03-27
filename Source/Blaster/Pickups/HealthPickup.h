@@ -15,7 +15,6 @@ class BLASTER_API AHealthPickup : public APickup
 	GENERATED_BODY()
 public:
 	AHealthPickup();
-	virtual void Destroyed() override;
 protected:
 	virtual void OnSphereOverlap(
 		UPrimitiveComponent* OverlappedComponent,
@@ -33,9 +32,4 @@ private:
 	UPROPERTY(EditAnywhere)
 	float HealingTime = 5.f;
 
-	UPROPERTY(VisibleAnywhere)
-	class UNiagaraComponent* PickupEffectComponent;
-
-	UPROPERTY(EditAnywhere)
-	class UNiagaraSystem* PickupEffect;
 };

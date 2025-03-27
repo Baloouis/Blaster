@@ -2,6 +2,9 @@
 
 
 #include "Pickup.h"
+
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 #include "Components/SphereComponent.h"
@@ -28,6 +31,9 @@ APickup::APickup()
 	PickupMesh->SetRelativeScale3D(FVector(5.f, 5.f, 5.f));
 	PickupMesh->SetRenderCustomDepth(true);
 	PickupMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_PURPLE);
+
+	PickupEffectComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("PickupEffectComponent"));
+	PickupEffectComponent->SetupAttachment(RootComponent);
 }
 
 void APickup::BeginPlay()
@@ -36,7 +42,14 @@ void APickup::BeginPlay()
 
 	if (HasAuthority())
 	{
-		OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &APickup::OnSphereOverlap);
+		//We use a timer and a delayed callback because if a player is standing on a pickup spawn point when it spawns
+		//then the Overlap event will happen too soon and we won't see it appearing
+		GetWorldTimerManager().SetTimer(
+			 BindOverlapTimer,
+			 this,
+			 &APickup::BindOverlapTimerFinished,
+			 BindOverlapTime
+		 );
 	}
 }
 
@@ -44,6 +57,12 @@ void APickup::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
 {
 
 }
+
+void APickup::BindOverlapTimerFinished()
+{
+	OverlapSphere->OnComponentBeginOverlap.AddDynamic(this, &APickup::OnSphereOverlap);
+}
+
 
 void APickup::Tick(float DeltaTime)
 {
@@ -64,6 +83,15 @@ void APickup::Destroyed()
 			this,
 			PickupSound,
 			GetActorLocation()
+		);
+	}
+	if (PickupEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			PickupEffect,
+			GetActorLocation(),
+			GetActorRotation()
 		);
 	}
 }
