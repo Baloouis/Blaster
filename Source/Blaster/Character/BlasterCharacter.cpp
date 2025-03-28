@@ -101,7 +101,14 @@ void ABlasterCharacter::Elim()
 {
 	if (CombatComponent && CombatComponent->EquippedWeapon)
 	{
-		CombatComponent->EquippedWeapon->Dropped();
+		if (CombatComponent->EquippedWeapon->bDestroyWeapon)
+		{
+			CombatComponent->EquippedWeapon->Destroy();
+		}
+		else
+		{
+			CombatComponent->EquippedWeapon->Dropped();
+		}
 	}
 	MulticastElim();
 	GetWorldTimerManager().SetTimer(
@@ -206,7 +213,9 @@ void ABlasterCharacter::BeginPlay()
 	BlasterPlayerController = Cast<ABlasterPlayerController>(GetController());
 	
 	AddInputMappingContextToPlayer();
-	
+
+	SpawDefaultWeapon();
+	UpdateHUDAmmo();
 	UpdateHUDHealth();
 	UpdateHUDShield();
 	
@@ -495,14 +504,7 @@ void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
-		if (HasAuthority()) // We're on the Server
-		{
-			CombatComponent->EquipWeapon(OverlappingWeapon);
-		}
-		else // We're on a Client
-		{
-			ServerEquipButtonPressed(); // calls RPC to execute this method on the Server side
-		}
+		ServerEquipButtonPressed(); // calls RPC to execute this method on the Server side
 	}
 }
 
@@ -633,6 +635,30 @@ void ABlasterCharacter::PollInit()
 	}
 }
 
+void ABlasterCharacter::UpdateHUDAmmo()
+{
+	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+	if (BlasterPlayerController && CombatComponent && CombatComponent->EquippedWeapon)
+	{
+		BlasterPlayerController->SetHUDCarriedAmmo(CombatComponent->CarriedAmmo);
+		BlasterPlayerController->SetHUDWeaponAmmo(CombatComponent->EquippedWeapon->GetAmmo());
+	}
+}
+ 
+void ABlasterCharacter::SpawDefaultWeapon()
+{
+	ABlasterGameMode* BlasterGameMode = Cast<ABlasterGameMode>(UGameplayStatics::GetGameMode(this));
+	UWorld* World = GetWorld();
+	if (BlasterGameMode && World && !bElimmed && DefaultWeaponClass)
+	{
+		AWeapon* StartingWeapon = World->SpawnActor<AWeapon>(DefaultWeaponClass);
+		StartingWeapon->bDestroyWeapon = true;
+		if (CombatComponent)
+		{
+			CombatComponent->EquipWeapon(StartingWeapon);
+		}
+	}
+}
 
 void ABlasterCharacter::StartDissolve()
 {
