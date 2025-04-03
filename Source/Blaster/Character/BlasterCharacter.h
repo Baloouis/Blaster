@@ -93,6 +93,8 @@ protected:
 	virtual void Jump() override;
 	void DashButtonPressed(const FInputActionValue& Value);
 	void GrenadeButtonPressed();
+	void DropOrDestroyWeapon(AWeapon* Weapon);
+	void DropOrDestroyWeapons();
 	
 	void AimOffset(float DeltaTime);
 	void SimProxiesTurn();

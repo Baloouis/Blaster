@@ -21,9 +21,11 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	void EquipWeapon(class AWeapon* WeaponToEquip);
+	void SwapWeapons();
 	void Reload();
 	UFUNCTION(BlueprintCallable)
 	void FinishReloading();
+	
 	void FireButtonPressed(bool bPressed);
 
 	UFUNCTION(BlueprintCallable)
@@ -33,7 +35,6 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void ThrowGrenadeFinished();
-
 	
 	UFUNCTION(BlueprintCallable)
 	void LaunchGrenade();
@@ -42,12 +43,14 @@ public:
 	void ServerLaunchGrenade(const FVector_NetQuantize& Target);
 
 	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
+
+	//bool bLocallyReloading = false; //local-only bool value to better handle animation issue that occurs with delay of reload combat state replication
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool bIsAiming);
 	
 	UFUNCTION(Server, Reliable)
-	void ServerSetAiming(bool bIsAiming);
+	void ServerSetAiming(bool bIsAiming); 	
 
 	UFUNCTION()
 	void OnRep_EquippedWeapon();
@@ -56,6 +59,14 @@ protected:
 	void OnRep_SecondaryWeapon();
 	
 	void Fire();
+	void FireProjectileWeapon();
+	void FireHitScanWeapon();
+	void FireShotgun();
+	void LocalFire(const FVector_NetQuantize& TraceHitTarget);
+	void ShotgunLocalFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
+
+	UFUNCTION(Server, Reliable)
+	void ServerReload();
 	
 	void HandleReload();
 	int32 AmountToReload();
@@ -80,15 +91,18 @@ protected:
 	void EquipSecondaryWeapon(AWeapon* WeaponToEquip);
 	
 	UFUNCTION(Server, Reliable)
-	void ServerReload();
-	
-	UFUNCTION(Server, Reliable)
 	void ServerFire(const FVector_NetQuantize& TraceHitTarget);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
 
-	void TracerUnderCrosshairs(FHitResult& TraceHitResult);
+	UFUNCTION(Server, Reliable)
+	void ServerShotgunFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
+ 
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastShotgunFire(const TArray<FVector_NetQuantize>& TraceHitTargets);
+	
+	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 
 	void SetHUDCrosshairs(float DeltaTime);;
 	
@@ -106,9 +120,16 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_SecondaryWeapon)
 	AWeapon* SecondaryWeapon;
 	
-	UPROPERTY(Replicated)
-	bool bAiming;
+	UPROPERTY(ReplicatedUsing = OnRep_Aiming)
+	bool bAiming = false;
 
+	// Locally controlled only variable in opposition to bAiming which is Replicated and controlled by the Server
+	bool bAimButtonPressed = false;
+ 
+	UFUNCTION()
+	void OnRep_Aiming();
+
+	
 	UPROPERTY(EditAnywhere)
 	float BaseWalkSpeed;
 	
@@ -222,9 +243,9 @@ private:
  
     void UpdateHUDGrenades();
      
-     public:	
-     	FORCEINLINE int32 GetGrenades() const { return Grenades; }
-
+ public:	
+    FORCEINLINE int32 GetGrenades() const { return Grenades; }
+	bool ShouldSwapWeapons();
 		
 };
 
