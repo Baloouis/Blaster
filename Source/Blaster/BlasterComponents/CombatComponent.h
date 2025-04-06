@@ -44,7 +44,7 @@ public:
 
 	void PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount);
 
-	//bool bLocallyReloading = false; //local-only bool value to better handle animation issue that occurs with delay of reload combat state replication
+	bool bLocallyReloading = false; //local-only bool value to better handle animation issue that occurs with delay of reload combat state replication
 protected:
 	virtual void BeginPlay() override;
 	void SetAiming(bool bIsAiming);

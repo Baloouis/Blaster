@@ -123,10 +123,11 @@ void UCombatComponent::PickupAmmo(EWeaponType WeaponType, int32 AmmoAmount)
 //Reload method is only called locally, on reload button is pressed
 void UCombatComponent::Reload()
 {
-	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_Unoccupied && EquippedWeapon && !EquippedWeapon->IsFull())
+	if (CarriedAmmo > 0 && CombatState == ECombatState::ECS_Unoccupied && EquippedWeapon && !EquippedWeapon->IsFull()  && !bLocallyReloading)
 	{
 		ServerReload(); // warns server and other clients that player is reloading
-		//HandleReload(); // reload locally ( visually )
+		HandleReload(); // reload locally ( visually )
+		bLocallyReloading = true;
 	}
 }
 
@@ -136,15 +137,15 @@ void UCombatComponent::ServerReload_Implementation()
 	
 	CombatState = ECombatState::ECS_Reloading;
 
-	HandleReload();
-	//if (!Character->IsLocallyControlled()) HandleReload(); // Cause HandleReload has already been called before for locally controlled character
+	//HandleReload();
+	if (!Character->IsLocallyControlled()) HandleReload(); // Cause HandleReload has already been called before for locally controlled character
 }
 
 void UCombatComponent::FinishReloading()
 {
 	if (Character == nullptr) return;
 
-	//bLocallyReloading = false;
+	bLocallyReloading = false;
 	if (Character->HasAuthority())
 	{
 		CombatState = ECombatState::ECS_Unoccupied;
@@ -211,7 +212,8 @@ void UCombatComponent::OnRep_CombatState()
 	switch (CombatState)
 	{
 	case ECombatState::ECS_Reloading:
-		HandleReload();
+		//HandleReload();
+		if (Character && !Character->IsLocallyControlled()) HandleReload();
 		break;
 	case ECombatState::ECS_Unoccupied:
 		if (bFireButtonPressed)
@@ -272,7 +274,10 @@ void UCombatComponent::ServerLaunchGrenade_Implementation(const FVector_NetQuant
 
 void UCombatComponent::HandleReload()
 {
-	Character->PlayReloadMontage();
+	if (Character)
+	{
+		Character->PlayReloadMontage();
+	}
 }
 
 int32 UCombatComponent::AmountToReload()
@@ -862,6 +867,7 @@ bool UCombatComponent::CanFire()
 	{
 		return false;
 	}
+	if (bLocallyReloading) return false;
 	//To Allow Shooting Shotgun While Reloading it
 	if (!EquippedWeapon->IsEmpty() && bCanFire && CombatState == ECombatState::ECS_Reloading && EquippedWeapon->GetWeaponType() == EWeaponType::EWT_Shotgun)
 	{
