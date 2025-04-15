@@ -36,7 +36,8 @@ AWeapon::AWeapon()
 	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	PickupWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickupWidget"));
-	PickupWidget->SetupAttachment(RootComponent); 
+	PickupWidget->SetupAttachment(RootComponent);
+	
 }
 
 void AWeapon::EnableCustomDepth(bool bEnable)
@@ -61,6 +62,7 @@ void AWeapon::BeginPlay()
 	{
 		PickupWidget->SetVisibility(false);
 	}
+
 }
 void AWeapon::Tick(float DeltaTime)
 {
@@ -167,24 +169,10 @@ void AWeapon::OnEquipped()
 	BlasterOwnerCharacter = BlasterOwnerCharacter == nullptr ? Cast<ABlasterCharacter>(GetOwner()) : BlasterOwnerCharacter;
 	if (BlasterOwnerCharacter && bUseServerSideRewindDefault)
 	{
-		if(GEngine)
-			GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, FString::Printf(TEXT("OnEquipped check 1")));
 		BlasterOwnerController = BlasterOwnerController == nullptr ? Cast<ABlasterPlayerController>(BlasterOwnerCharacter->Controller) : BlasterOwnerController;
 
-		if (BlasterOwnerController && HasAuthority())
-		{
-			if(GEngine)
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, FString::Printf(TEXT("OnEquipped check 1bis")));
-		}
-		if (BlasterOwnerController && HasAuthority() && !BlasterOwnerController->HighPingDelegate.IsBound())
-		{
-			if(GEngine)
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, FString::Printf(TEXT("OnEquipped check 1ter")));
-		}
 		if (BlasterOwnerController && HasAuthority() && !BlasterOwnerController->HighPingDelegate.IsBound() && !BlasterOwnerCharacter->IsLocallyControlled()) //added !BlasterOwnerCharacter->IsLocallyControlled() so that Server dont do it on its own character
 		{
-			if(GEngine)
-				GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Cyan, FString::Printf(TEXT("OnEquipped check 2")));
 			BlasterOwnerController->HighPingDelegate.AddDynamic(this, &AWeapon::OnPingTooHigh);
 		}
 	}
@@ -231,7 +219,7 @@ void AWeapon::OnEquippedSecondary()
 		WeaponMesh->SetEnableGravity(true);
 		WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 	}
-	EnableCustomDepth(true);
+	//EnableCustomDepth(true);
 	if (WeaponMesh)
 	{
 		WeaponMesh->SetCustomDepthStencilValue(CUSTOM_DEPTH_TAN);

@@ -504,6 +504,17 @@ void ABlasterCharacter::PlayHitReactMontage()
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
+
+void ABlasterCharacter::PlaySwapMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && SwapMontage)
+	{
+		AnimInstance->Montage_Play(SwapMontage);
+	}
+}
+
+
 void ABlasterCharacter::RotateInPlace(float DeltaTime)
 {
 	if (bDisableGameplay)
@@ -621,7 +632,20 @@ void ABlasterCharacter::EquipButtonPressed(const FInputActionValue& Value)
 	if (bDisableGameplay) return;
 	if (CombatComponent)
 	{
-		ServerEquipButtonPressed(); // calls RPC to execute this method on the Server side
+		//ServerEquipButtonPressed(); // calls RPC to execute this method on the Server side
+		
+		if (CombatComponent->CombatState == ECombatState::ECS_Unoccupied) ServerEquipButtonPressed();
+		bool bSwap = CombatComponent->ShouldSwapWeapons() && 
+			!HasAuthority() && //if we're the character controlled by the Server, just calling ServerEquipButtonPressed() RPC is enough
+			CombatComponent->CombatState == ECombatState::ECS_Unoccupied && 
+			OverlappingWeapon == nullptr;
+ 
+		if (bSwap)
+		{
+			PlaySwapMontage();
+			CombatComponent->CombatState = ECombatState::ECS_SwappingWeapons;
+			bFinishedSwapping = false;
+		}
 	}
 }
 
@@ -637,7 +661,8 @@ void ABlasterCharacter::ServerEquipButtonPressed_Implementation()
 		else if (CombatComponent->ShouldSwapWeapons())
 		{
 			CombatComponent->SwapWeapons();
-		}	}
+		}
+	}
 }
 
 void ABlasterCharacter::CrouchButtonPressed(const FInputActionValue& Value)
