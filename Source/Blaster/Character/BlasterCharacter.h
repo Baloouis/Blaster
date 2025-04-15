@@ -49,7 +49,10 @@ public:
 
 	void UpdateHUDAmmo();
  
-	void SpawDefaultWeapon();
+	void SpawnDefaultWeapon();
+	
+	UPROPERTY()
+	TMap<FName, class UBoxComponent*> HitCollisionBoxes;
 protected:
 	virtual void BeginPlay() override;
 
@@ -188,12 +191,20 @@ private:
 	UFUNCTION()
 	void OnRep_OverlappingWeapon(AWeapon* LastWeapon);
 
+	
+	/** 
+	* Blaster components
+	*/
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	class UCombatComponent* CombatComponent;
-
 	
 	UPROPERTY(VisibleAnywhere)
 	class UBuffComponent* Buff;
+
+	UPROPERTY(VisibleAnywhere)
+	class ULagCompensationComponent* LagCompensation;
+
 	
 	UFUNCTION(Server, Reliable)
 	void ServerEquipButtonPressed();
@@ -366,6 +377,7 @@ public:
 	FORCEINLINE UStaticMeshComponent* GetAttachedGrenade() const { return AttachedGrenade; }
 	FORCEINLINE UBuffComponent* GetBuff() const { return Buff; }
 	bool IsLocallyReloading();
+	FORCEINLINE ULagCompensationComponent* GetLagCompensation() const { return LagCompensation; }
 };
 
 

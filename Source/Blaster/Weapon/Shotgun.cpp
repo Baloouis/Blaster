@@ -2,8 +2,11 @@
 
 
 #include "Shotgun.h"
+
+#include "Blaster/BlasterComponents/LagCompensationComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "particles/ParticleSystemComponent.h"
@@ -62,11 +65,19 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 				}
 			}
 		}
-		if (HasAuthority())
+
+		
+		TArray<ABlasterCharacter*> HitCharacters;
+
+		for (auto HitPair : HitMap)
 		{
-			for (auto HitPair : HitMap)
+			if (HitPair.Key && InstigatorController)
 			{
-				if (HitPair.Key && InstigatorController)
+				//if we're on Server && OwnerPawn->IsLocallyControlled() then SSR or not we should do damage hear without going by SSR methods
+				//if we're on Server and !bUseServerSideRewind then it's for a Client weapon that is not using SSR, and we should do damage here too
+				//otherwise damage is applied by SSR method ( after checking for valid hit of course)
+				bool bCauseAuthoritativeDamage = !bUseServerSideRewind || OwnerPawn->IsLocallyControlled();
+				if (HasAuthority() &&  bCauseAuthoritativeDamage)
 				{
 					UGameplayStatics::ApplyDamage(
 						HitPair.Key, // Character that was hit
@@ -76,11 +87,28 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 						UDamageType::StaticClass()
 					);
 				}
-			}	
+
+				HitCharacters.Add(HitPair.Key); // We add the hit character outside the if check because it will be needed for SSR
+			}
+		}
+
+		if (!HasAuthority() && bUseServerSideRewind )
+		{
+			BlasterOwnerCharacter = BlasterOwnerCharacter == nullptr ? Cast<ABlasterCharacter>(OwnerPawn) : BlasterOwnerCharacter;
+			BlasterOwnerController = BlasterOwnerController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterOwnerController;
+			if (BlasterOwnerController && BlasterOwnerCharacter && BlasterOwnerCharacter->GetLagCompensation() && BlasterOwnerCharacter->IsLocallyControlled())
+			{
+				//With this call the Server is gonna launch Server-Side Rewind and handle tthe consequences like damages
+				BlasterOwnerCharacter->GetLagCompensation()->ShotgunServerScoreRequest(
+					HitCharacters,
+					Start,
+					HitTargets,
+					BlasterOwnerController->GetServerTime() - BlasterOwnerController->SingleTripTime
+				);
+			}
 		}
 	}
 }
-
 
 void AShotgun::ShotgunTraceEndWithScatter(const FVector& HitTarget, TArray<FVector_NetQuantize>& HitTargets)
 {

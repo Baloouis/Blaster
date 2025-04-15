@@ -137,7 +137,28 @@ protected:
  
 	UPROPERTY(EditAnywhere, Category = "Weapon Scatter")
 	float SphereRadius = 75.f;
+
+	UPROPERTY(EditAnywhere)
+	float Damage = 20.f;
+
+	UPROPERTY(EditAnywhere)
+	bool bUseServerSideRewindDefault = false; //because bUseServerSideRewind is changing dynamically we added this bool for the if check in OnEquipped() method
 	
+	UPROPERTY(Replicated, EditAnywhere)
+	bool bUseServerSideRewind = false;
+ 
+	UPROPERTY()
+	class ABlasterCharacter* BlasterOwnerCharacter;
+	UPROPERTY()
+	class ABlasterPlayerController* BlasterOwnerController;
+	
+	UFUNCTION()
+	void OnPingTooHigh(bool bPingTooHigh);
+
+	// try every frame to init important null variables, that are not necessarely init synchronously with Character class)
+	void PollInit();
+	bool HasSetController = false;
+
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
 	USkeletalMeshComponent* WeaponMesh;
@@ -178,15 +199,10 @@ private:
 	// The number of unprocessed server requests for Ammo.
 	// Incremented in SpendRound, decremented in ClientUpdateAmmo.
 	int32 Sequence = 0;
-	
-	UPROPERTY()
-	class ABlasterCharacter* BlasterOwnerCharacter;
-	UPROPERTY()
-	class ABlasterPlayerController* BlasterOwnerController;
 
 	UPROPERTY(EditAnywhere)
 	EWeaponType WeaponType;
-	
+
 public:
 	void SetWeaponState(EWeaponState State);
 	FORCEINLINE USphereComponent* GetAreaSphere() const { return AreaSphere; }
@@ -198,6 +214,6 @@ public:
 	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE int32 GetMagCapacity() const { return MagCapacity; }
-
+	FORCEINLINE float GetDamage() const { return Damage; }
 };
 
