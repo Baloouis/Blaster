@@ -5,11 +5,8 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "Blaster/Character/BlasterCharacter.h"
 #include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetMathLibrary.h"
 #include "particles/ParticleSystemComponent.h"
 #include "Sound/SoundCue.h"
-#include "WeaponTypes.h"
-#include "DrawDebugHelpers.h"
 #include "Blaster/BlasterComponents/LagCompensationComponent.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
 
@@ -125,7 +122,7 @@ void AHitScanWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& Hi
 			BeamEnd = OutHit.ImpactPoint;
 		}
 		
-		DrawDebugSphere(GetWorld(), BeamEnd, 16.f, 12, FColor::Orange, true);
+		//DrawDebugSphere(GetWorld(), BeamEnd, 16.f, 12, FColor::Orange, true);
 		
 		if (BeamParticles)
 		{

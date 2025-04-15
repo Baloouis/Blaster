@@ -1,5 +1,7 @@
 
 #include "BlasterPlayerController.h"
+
+#include "EnhancedInputComponent.h"
 #include "Blaster/HUD/BlasterHUD.h"
 #include "Blaster/HUD/CharacterOverlay.h"
 #include "Components/ProgressBar.h"
@@ -12,6 +14,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blaster/BlasterComponents/CombatComponent.h"
 #include "Blaster/GameState/BlasterGameState.h"
+#include "Blaster/HUD/ReturnToMainMenu.h"
 #include "Blaster/PlayerState/BlasterPlayerState.h"
 #include "Blaster/Weapon/Weapon.h"
 #include "Components/Image.h"
@@ -82,7 +85,7 @@ void ABlasterPlayerController::CheckPing(float DeltaTime)
 		
 		if (PlayerState)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("PlayerState->GetPingInMilliseconds() : %f"), PlayerState->GetPingInMilliseconds());
+			//UE_LOG(LogTemp, Warning, TEXT("PlayerState->GetPingInMilliseconds() : %f"), PlayerState->GetPingInMilliseconds());
 			if (PlayerState->GetPingInMilliseconds() > HighPingThreshold)
 			{
 				HighPingWarning();
@@ -109,6 +112,28 @@ void ABlasterPlayerController::CheckPing(float DeltaTime)
 		}
 	}
 }
+
+void ABlasterPlayerController::ShowReturnToMainMenu()
+{
+	if (ReturnToMainMenuWidget == nullptr) return;
+	if (ReturnToMainMenu == nullptr)
+	{
+		ReturnToMainMenu = CreateWidget<UReturnToMainMenu>(this, ReturnToMainMenuWidget);
+	}
+	if (ReturnToMainMenu)
+	{
+		bReturnToMainMenuOpen = !bReturnToMainMenuOpen;
+		if (bReturnToMainMenuOpen)
+		{
+			ReturnToMainMenu->MenuSetup();
+		}
+		else
+		{
+			ReturnToMainMenu->MenuTearDown();
+		}
+	}
+}
+
 // Is the ping too high?
 void ABlasterPlayerController::ServerReportPingStatus_Implementation(bool bHighPing)
 {
@@ -454,6 +479,30 @@ void ABlasterPlayerController::PollInit()
 		}
 	}
 }
+
+void ABlasterPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	if (InputComponent == nullptr) return;
+	
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		EnhancedInputComponent->BindAction(QuitAction, ETriggerEvent::Completed, this, &ABlasterPlayerController::ShowReturnToMainMenu);
+	}
+}
+
+void ABlasterPlayerController::PawnLeavingGame()
+{
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
+	if (BlasterCharacter && !BlasterCharacter->GetLeftGame())
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("PawnLeavingGame"));
+		BlasterCharacter->Elim(true);
+	}
+ 
+	Super::PawnLeavingGame();
+}
+
 void ABlasterPlayerController::OnMatchStateSet(FName State)
 {
 	MatchState = State;
