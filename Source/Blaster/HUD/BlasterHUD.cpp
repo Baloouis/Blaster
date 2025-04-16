@@ -3,9 +3,13 @@
 
 #include "BlasterHUD.h"
 
+#include "ElimAnnouncement.h"
 #include "Announcement.h"
 #include "CharacterOverlay.h"
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
 #include "GameFramework/PlayerController.h"
 
 void ABlasterHUD::BeginPlay()
@@ -21,6 +25,63 @@ void ABlasterHUD::AddAnnouncement()
     {
         Announcement = CreateWidget<UAnnouncement>(PlayerController, AnnouncementClass);
         Announcement->AddToViewport();
+    }
+}
+
+void ABlasterHUD::AddElimAnnouncement(FString Attacker, FString Victim)
+{
+    OwningPlayer = OwningPlayer == nullptr ? GetOwningPlayerController() : OwningPlayer;
+    if (OwningPlayer && ElimAnnouncementClass)
+    {
+        UElimAnnouncement* ElimAnnouncementWidget  = CreateWidget<UElimAnnouncement>(OwningPlayer, ElimAnnouncementClass);
+        if (ElimAnnouncementWidget )
+        {
+            ElimAnnouncementWidget->SetElimAnnouncementText(Attacker, Victim);
+            ElimAnnouncementWidget->AddToViewport();
+
+            //Move all the previous UElimAnnouncement up before adding new one
+            for (UElimAnnouncement* Msg : ElimMessages)
+            {
+                if (Msg && Msg->AnnouncementBox)
+                {
+                    //We need to move up the previous announcement by their height which we can get by getting CanvasSlot
+                    //The slot is also useful to actually move the widget
+                    UCanvasPanelSlot* CanvasSlot = UWidgetLayoutLibrary::SlotAsCanvasSlot(Msg->AnnouncementBox);
+                    if (CanvasSlot)
+                    {
+                        FVector2D Position = CanvasSlot->GetPosition();
+                        FVector2D NewPosition(
+                            CanvasSlot->GetPosition().X,
+                            Position.Y - CanvasSlot->GetSize().Y //Moving widget up by its height
+                        );
+                        CanvasSlot->SetPosition(NewPosition);
+                    }
+                }
+            }
+            
+            //Then add new UElimAnnouncement
+            ElimMessages.Add(ElimAnnouncementWidget);
+
+            //Set the Timer and callback to ElimANnouncementTimerFinished method when the timer is done
+            FTimerHandle ElimMsgTimer;
+            FTimerDelegate ElimMsgDelegate;
+            ElimMsgDelegate.BindUObject(this, &ThisClass::ElimAnnouncementTimerFinished, ElimAnnouncementWidget);
+            GetWorldTimerManager().SetTimer(
+                ElimMsgTimer,
+                ElimMsgDelegate,
+                ElimAnnouncementTime,
+                false
+            );
+        }
+    }
+}
+
+void ABlasterHUD::ElimAnnouncementTimerFinished(UElimAnnouncement* MsgToRemove)
+{
+    if (MsgToRemove)
+    {
+        MsgToRemove->RemoveFromParent();
+        ElimMessages.Remove(MsgToRemove);
     }
 }
 
