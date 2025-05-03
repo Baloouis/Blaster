@@ -23,26 +23,6 @@ AProjectileBullet::AProjectileBullet()
 void AProjectileBullet::BeginPlay()
 {
 	Super::BeginPlay();
-
-	/*
-	 
-	FPredictProjectilePathParams PathParams;
-	PathParams.bTraceWithChannel = true;
-	PathParams.TraceChannel = ECollisionChannel::ECC_Visibility;
-	PathParams.bTraceWithCollision = true;
-	PathParams.DrawDebugType = EDrawDebugTrace::ForDuration;
-	PathParams.DrawDebugTime = 5.f;
-	PathParams.LaunchVelocity = GetActorForwardVector() * InitialSpeed;
-	PathParams.ProjectileRadius = 5.f;
-	PathParams.MaxSimTime = 4.f; //Max duration of the check simulation for the projectile
-	PathParams.SimFrequency = 30.f; // Number of times by seconds we will trace to check for hits
-	PathParams.StartLocation = GetActorLocation();
-	PathParams.ActorsToIgnore.Add(this);
- 
-	FPredictProjectilePathResult PathResult;
- 
-	UGameplayStatics::PredictProjectilePath(this, PathParams, PathResult);
-	*/
 }
 
 #if WITH_EDITOR
@@ -73,7 +53,9 @@ void AProjectileBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 		{
 			if (OwnerCharacter->HasAuthority() && !bUseServerSideRewind) //we check for !bUseServerSideRewind because if weapon is using SSR then damage will be done in SSR system and doing it here also would result in double-damage
 			{
-				UGameplayStatics::ApplyDamage(OtherActor, Damage, OwnerController, this, UDamageType::StaticClass());
+				const float DamageToCause = Hit.BoneName.ToString() == FString("head") ? HeadShotDamage : Damage;
+				UGameplayStatics::ApplyDamage(OtherActor, DamageToCause, OwnerController, this, UDamageType::StaticClass());
+
 				Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
 				return;
 			}

@@ -142,6 +142,9 @@ protected:
 	float Damage = 20.f;
 
 	UPROPERTY(EditAnywhere)
+	float HeadShotDamage = 40.f;
+	
+	UPROPERTY(EditAnywhere)
 	bool bUseServerSideRewindDefault = false; //because bUseServerSideRewind is changing dynamically we added this bool for the if check in OnEquipped() method
 	
 	UPROPERTY(Replicated, EditAnywhere)
@@ -215,5 +218,6 @@ public:
 	FORCEINLINE int32 GetAmmo() const { return Ammo; }
 	FORCEINLINE int32 GetMagCapacity() const { return MagCapacity; }
 	FORCEINLINE float GetDamage() const { return Damage; }
+	FORCEINLINE float GetHeadShotDamage() const { return HeadShotDamage; }
 };
 
