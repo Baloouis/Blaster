@@ -4,6 +4,7 @@
 #include "BlasterPlayerState.h"
 
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/BlasterTypes/Team.h"
 #include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "Net/UnrealNetwork.h"
 
@@ -13,6 +14,7 @@ void ABlasterPlayerState::GetLifetimeReplicatedProps(TArray<class FLifetimePrope
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ABlasterPlayerState, Defeats);
+	DOREPLIFETIME(ABlasterPlayerState, Team);
 }
 
 

@@ -62,7 +62,7 @@ void ABlasterHUD::AddElimAnnouncement(FString Attacker, FString Victim)
             //Then add new UElimAnnouncement
             ElimMessages.Add(ElimAnnouncementWidget);
 
-            //Set the Timer and callback to ElimANnouncementTimerFinished method when the timer is done
+            //Set the Timer and callback to ElimAnnouncementTimerFinished method when the timer is done
             FTimerHandle ElimMsgTimer;
             FTimerDelegate ElimMsgDelegate;
             ElimMsgDelegate.BindUObject(this, &ThisClass::ElimAnnouncementTimerFinished, ElimAnnouncementWidget);

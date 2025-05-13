@@ -6,6 +6,8 @@ void ABlasterGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ABlasterGameState, TopScoringPlayers);
+	DOREPLIFETIME(ABlasterGameState, RedTeamScore);
+	DOREPLIFETIME(ABlasterGameState, BlueTeamScore);
 }
 
 //its important to keep in mind that multiple players can have the same high score, thus we can have multiple Top players for the game
@@ -26,4 +28,12 @@ void ABlasterGameState::UpdateTopScore(class ABlasterPlayerState* ScoringPlayer)
 		TopScoringPlayers.AddUnique(ScoringPlayer);
 		TopScore = ScoringPlayer->GetScore();
 	}
+}
+
+void ABlasterGameState::OnRep_RedTeamScore()
+{
+}
+
+void ABlasterGameState::OnRep_BlueTeamScore()
+{
 }
