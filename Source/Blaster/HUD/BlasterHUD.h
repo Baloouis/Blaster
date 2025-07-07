@@ -49,7 +49,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Announcements")
 	TSubclassOf<UUserWidget> AnnouncementClass;
 	
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, Category = "Announcements")
 	class UAnnouncement* Announcement;
 	void AddAnnouncement();
 

@@ -93,6 +93,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					SocketTransform
 				);
 			}
+			
 			if (FireSound)
 			{
 				UGameplayStatics::PlaySoundAtLocation(
@@ -101,6 +102,7 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					GetActorLocation()
 				);
 			}
+			
 		}
 	}
 }
