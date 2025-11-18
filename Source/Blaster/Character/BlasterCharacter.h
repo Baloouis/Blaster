@@ -56,7 +56,9 @@ public:
 	void UpdateHUDShield();
 
 	void UpdateHUDAmmo();
- 
+
+	void UpdateHUDGrenade();
+	
 	void SpawnDefaultWeapon();
 	
 	UPROPERTY()
@@ -437,7 +439,7 @@ public:
 	bool IsLocallyReloading();
 	FORCEINLINE ULagCompensationComponent* GetLagCompensation() const { return LagCompensation; }
 	FORCEINLINE bool GetLeftGame() const { return bLeftGame; }
-	FORCEINLINE bool IsHoldingTheFlag() const;
+	bool IsHoldingTheFlag() const;
 	ETeam GetTeam();
 	void SetHoldingTheFlag(bool bHolding);
 

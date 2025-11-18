@@ -27,6 +27,7 @@ void ABlasterPlayerController::BeginPlay()
 	PrimaryActorTick.bCanEverTick = true;
 	
 	BlasterHUD = Cast<ABlasterHUD>(GetHUD());
+
 	ServerCheckMatchState();
 }
 
@@ -111,7 +112,7 @@ void ABlasterPlayerController::ServerCheckMatchState_Implementation()
 		CooldownTime = GameMode->CooldownTime;
 		LevelStartingTime = GameMode->LevelStartingTime;
 		bShowTeamScores = GameMode->bTeamsMatch;
-
+		
 		ClientJoinMidgame(MatchState, WarmupTime, MatchTime, CooldownTime, LevelStartingTime, bShowTeamScores);
 	}
 }
@@ -123,7 +124,7 @@ void ABlasterPlayerController::ClientJoinMidgame_Implementation(FName StateOfMat
 	LevelStartingTime = StartingTime;
 	MatchState = StateOfMatch;
 	OnMatchStateSet(MatchState, bIsTeamMatch);
-
+	
 	if (BlasterHUD && MatchState == MatchState::WaitingToStart)
 	{
 		BlasterHUD->AddAnnouncement();
@@ -218,7 +219,9 @@ void ABlasterPlayerController::OnRep_ShowTeamScores()
 void ABlasterPlayerController::ServerReportPingStatus_Implementation(bool bHighPing)
 {
 	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, FString::Printf(TEXT("HighPingDelegate.Broadcast(%d)f"), bHighPing));	
+	{
+		//GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Yellow, FString::Printf(TEXT("HighPingDelegate.Broadcast(%d)f"), bHighPing));
+	}
 	HighPingDelegate.Broadcast(bHighPing);
 }
  
@@ -275,6 +278,9 @@ void ABlasterPlayerController::OnPossess(APawn* InPawn)
 	{
 		SetHUDHealth(BlasterCharacter->GetHealth(), BlasterCharacter->GetMaxHealth());
 		SetHUDShield(BlasterCharacter->GetShield(), BlasterCharacter->GetMaxShield());
+
+		SetHUDGrenades(BlasterCharacter->GetCombat()->GetGrenades());
+		
 		BlasterCharacter->UpdateHUDAmmo();
 	}
 }
@@ -456,11 +462,19 @@ void ABlasterPlayerController::SetHUDGrenades(int32 Grenades)
 		BlasterHUD->CharacterOverlay->GrenadesText;
 	if (bHUDValid)
 	{
+		if (GEngine)
+		{
+			//GEngine->AddOnScreenDebugMessage(0, 3, FColor::Red, TEXT("bInitializeGrenades B"));
+		}
 		FString GrenadesText = FString::Printf(TEXT("%d"), Grenades);
 		BlasterHUD->CharacterOverlay->GrenadesText->SetText(FText::FromString(GrenadesText));
 	}
 	else
 	{
+		if (GEngine)
+		{
+			//GEngine->AddOnScreenDebugMessage(0, 3, FColor::Red, TEXT("bInitializeGrenades C"));
+		}
 		bInitializeGrenades = true;
 		HUDGrenades = Grenades;
 	}
@@ -550,11 +564,19 @@ void ABlasterPlayerController::PollInit()
 				}
 				if (bInitializeWeaponAmmo) SetHUDWeaponAmmo(HUDWeaponAmmo);
 				if (bInitializeTeamScores) InitTeamScores();
+
 				
 				ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
 				if (BlasterCharacter && BlasterCharacter->GetCombat())
 				{
-					if (bInitializeGrenades) SetHUDGrenades(BlasterCharacter->GetCombat()->GetGrenades());
+					if (bInitializeGrenades)
+					{
+						if (GEngine)
+						{
+							//GEngine->AddOnScreenDebugMessage(0, 3, FColor::Red, TEXT("bInitializeGrenades A"));
+						}
+						SetHUDGrenades(BlasterCharacter->GetCombat()->GetGrenades());
+					}
 				}
 			}
 		}
@@ -622,7 +644,7 @@ void ABlasterPlayerController::HandleMatchHasStarted(bool bTeamsMatch)
 			BlasterHUD->Announcement->SetVisibility(ESlateVisibility::Hidden);
 		}
 		//if (!HasAuthority()) return;
-		if (bTeamsMatch)
+		if (bShowTeamScores)
 		{
 			InitTeamScores();
 		}

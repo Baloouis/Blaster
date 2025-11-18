@@ -184,6 +184,7 @@ void ABlasterCharacter::BeginPlay()
 	UpdateHUDAmmo();
 	UpdateHUDHealth();
 	UpdateHUDShield();
+	UpdateHUDGrenade();
 	
 	if (HasAuthority())
 	{
@@ -927,6 +928,20 @@ void ABlasterCharacter::PollInit()
 			}
 		}
 	}
+	if (BlasterPlayerController == nullptr)
+	{
+	
+		
+		BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+		if (BlasterPlayerController)
+		{
+			SpawnDefaultWeapon();
+			UpdateHUDAmmo();
+			UpdateHUDGrenade();
+			UpdateHUDHealth();
+			UpdateHUDShield();
+		}
+	}
 }
 
 void ABlasterCharacter::UpdateHUDAmmo()
@@ -936,6 +951,14 @@ void ABlasterCharacter::UpdateHUDAmmo()
 	{
 		BlasterPlayerController->SetHUDCarriedAmmo(CombatComponent->CarriedAmmo);
 		BlasterPlayerController->SetHUDWeaponAmmo(CombatComponent->EquippedWeapon->GetAmmo());
+	}
+}
+void ABlasterCharacter::UpdateHUDGrenade()
+{
+	BlasterPlayerController = BlasterPlayerController == nullptr ? Cast<ABlasterPlayerController>(Controller) : BlasterPlayerController;
+	if (BlasterPlayerController && CombatComponent)
+	{
+		BlasterPlayerController->SetHUDGrenades(CombatComponent->GetGrenades());
 	}
 }
  
