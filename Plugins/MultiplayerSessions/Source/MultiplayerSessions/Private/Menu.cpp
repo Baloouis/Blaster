@@ -116,7 +116,7 @@ void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SessionResu
 				-1,
 				15.f,
 				FColor::Yellow,
-				FString(TEXT("OnFindSessions 0"))
+				FString(TEXT("OnFindSessions 0 : MultiplayerSessionsSubsystem was nullptr"))
 				);
 		}
 		return;
@@ -129,7 +129,7 @@ void UMenu::OnFindSessions(const TArray<FOnlineSessionSearchResult>& SessionResu
 				-1,
 				15.f,
 				FColor::Yellow,
-				FString(TEXT("OnFindSessions SessionResults for loop"))
+				FString::Printf(TEXT("OnFindSessions : session for %d players found"),Result.Session.NumOpenPublicConnections)
 				);
 		}
 		FString SettingsValue;
@@ -235,6 +235,7 @@ void UMenu::HostButtonClicked()
 	HostButton->SetIsEnabled(false);
 	if(MultiplayerSessionsSubsystem)
 	{
+		
 		MultiplayerSessionsSubsystem->CreateSession(NumPublicConnections, MatchType);
 
 		if (GEngine)
@@ -243,7 +244,7 @@ void UMenu::HostButtonClicked()
 				-1,
 				15.f,
 				FColor::Yellow,
-				FString(TEXT("HostButtonClicked CreateSession called"))
+				FString::Printf(TEXT("HostButtonClicked.CreateSession called for %d Players"),NumPublicConnections)
 				);
 		}
 	}

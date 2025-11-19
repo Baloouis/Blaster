@@ -175,7 +175,7 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
             -1,
             15.f,
             FColor::Yellow,
-            FString(TEXT("JoinSession 0"))
+            FString::Printf(TEXT("JoinSession called for a session with %d players"),SessionResult.Session.NumOpenPrivateConnections)
             );
     }
     if (!SessionInterface.IsValid())
@@ -186,7 +186,7 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
                 -1,
                 15.f,
                 FColor::Yellow,
-                FString(TEXT("JoinSession 1"))
+                FString(TEXT("JoinSession 1 : Session Interface is not valid"))
                 );
         }
         MultiplayerOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
@@ -199,7 +199,7 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
             -1,
             15.f,
             FColor::Yellow,
-            FString(TEXT("JoinSession 2"))
+            FString(TEXT("JoinSession 2 : session interface is valid"))
             );
     }
     JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
@@ -217,7 +217,7 @@ void UMultiplayerSessionsSubsystem::JoinSession(const FOnlineSessionSearchResult
                 -1,
                 15.f,
                 FColor::Yellow,
-                FString(TEXT("JoinSession 3"))
+                FString(TEXT("JoinSession 3 : session exists but couldnt join"))
                 );
         }
     }
