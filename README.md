@@ -15,6 +15,7 @@ Developed while following Stephen Ulibarri’s Udemy course "UE5 C++ Multiplayer
 - 
 # Implemented Multiplayer Features : 
 - Multiplayer Plugin using Steam Online Subsytem : Hosting/Joining sessions online, with associated Lobby level and corresponding logic.
+- Lag Detection and associated Warnings and Lag Compensation Techniques
 - Client-Side Prediction : 
 - Server-Side Rewind : 
 
