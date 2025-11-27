@@ -32,11 +32,11 @@ To prevent delay on the Client side for visualizing protected variables/actions 
 To try and compensate for possible Client lag when shooting a target.
 On the Server every frame we keep track of all players with approximative BoxCollision objects, and keep the saved info for a couple of seconds.
 
-https://github.com/user-attachments/assets/c4a120f5-928c-4f41-ac70-10d27a4a4b86
+https://github.com/user-attachments/assets/dde64db3-d37b-41e0-b137-26b2697e0dcc
 
 Then, if on the Client the player’s character has shot somebody, the Server will check if at the exact time of the shot being fired the presumably shot character was in fact really on the path of the bullet. If yes the Client shot is registered on the Server ( and sent to everyone else ), else it is ignored.
 
-https://github.com/user-attachments/assets/723673f3-7693-49d4-b6fb-9a6a5c571c46
+https://github.com/user-attachments/assets/4236a1c3-cc3f-4d80-9519-86caa97252e3
 
 ## Installation : 
 
