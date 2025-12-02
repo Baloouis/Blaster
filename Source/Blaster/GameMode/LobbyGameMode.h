@@ -19,4 +19,6 @@ public:
 private:
 	UPROPERTY(EditAnywhere)
 	int NumberOfPlayersBeforeStart = 2;
+	UPROPERTY(EditAnywhere)
+	bool bStartUsingDesiredNumOfPublicConnections = false;
 };

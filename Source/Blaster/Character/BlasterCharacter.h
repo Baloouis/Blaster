@@ -205,6 +205,7 @@ protected:
 	UBoxComponent* foot_r;
  
 private:
+	
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class USpringArmComponent* CameraBoom;
 	

@@ -16,7 +16,8 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		UMultiplayerSessionsSubsystem* Subsystem = GameInstance->GetSubsystem<UMultiplayerSessionsSubsystem>();
 		check(Subsystem);
 
-		if (NumberOfPlayers == Subsystem->DesiredNumPublicConnections)
+		bool bShouldStartGame = (!bStartUsingDesiredNumOfPublicConnections &&  NumberOfPlayers >= NumberOfPlayersBeforeStart) || (bStartUsingDesiredNumOfPublicConnections && NumberOfPlayers == Subsystem->DesiredNumPublicConnections);
+		if (bShouldStartGame)
 		{
 			UWorld* World = GetWorld();
 			if (World)
@@ -26,15 +27,15 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 				FString MatchType = Subsystem->DesiredMatchType;
 				if (MatchType == "FreeForAll")
 				{
-					World->ServerTravel(FString("/Game/Maps/FreeForAllMap?listen"));
+					World->ServerTravel(FString("/Game/Maps/FreeForAllMap_Update?listen"));
 				}
 				else if (MatchType == "Teams")
 				{
-					World->ServerTravel(FString("/Game/Maps/TeamsMap?listen"));
+					World->ServerTravel(FString("/Game/Maps/TeamsMap_Update?listen"));
 				}
 				else if (MatchType == "CaptureTheFlag")
 				{
-					World->ServerTravel(FString("/Game/Maps/CaptureTheFlagMap?listen"));
+					World->ServerTravel(FString("/Game/Maps/CaptureTheFlagMap_Update?listen"));
 				}
 			}
 		}

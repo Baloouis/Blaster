@@ -24,7 +24,6 @@ protected:
 	// That's why we use Initialize and not just add code to the constructor of this Widget.
 	//
 	virtual bool Initialize() override;
-
 	virtual void NativeDestruct() override;
 
 	//

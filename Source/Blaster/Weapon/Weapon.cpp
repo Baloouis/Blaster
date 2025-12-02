@@ -265,7 +265,7 @@ void AWeapon::SpendRound()
 	// server reconciliation
 	if (HasAuthority())
 	{
-		//calls Client RPC, to let all the Client knows the server's authoritative value for Ammo
+		//calls Client RPC, to let all the Clients know the server's authoritative value for Ammo
 		ClientUpdateAmmo(Ammo);
 	}
 	else if (BlasterOwnerCharacter && BlasterOwnerCharacter->IsLocallyControlled())
@@ -285,7 +285,7 @@ void AWeapon::ClientUpdateAmmo_Implementation(int32 ServerAmmo)
 	//below are the Client-Side Prediction calculations
 	//NB: here the calculations for the Server Reconciliation process is lighter than usual
 	// because we know that each time we incremented sequence we only decrement Ammo
-	// otherwise we would have needed to store the values of the data at which point of the Sequence
+	// otherwise we would have needed to store the values of the data at each point of the Sequence
 	// in order to process data from the Server
 	
 	--Sequence;
