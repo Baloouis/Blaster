@@ -5,6 +5,8 @@ It uses Unreal Engine’s Authoritative Client-Server model and was developed wh
 
 It features custom multiplayer systems (lag compensation, prediction, rewind, cheating prevention) along with full gameplay implementation: different weapons, complex characters animations, various game modes, and UI.
 
+https://github.com/user-attachments/assets/48d607d5-0da4-4f6b-8945-6a2bccedb21b
+
 # How to play : 
 
 ## Preview locally
@@ -34,6 +36,8 @@ It features custom multiplayer systems (lag compensation, prediction, rewind, ch
 - **Characters fully animated** from scratch, using IK, Blend Spaces, and Animation Montages for responsive, layered animation states that adapt smoothly to player actions and networked gameplay.
 - **UI/GUI** including Start Menu for Multiplayer sessions management, and in-game HUD with replicated game state indicators.
 - **Multiplayer-ready gameplay design**, ensuring all core systems (weapons, movement, abilities, scoring, pickups) behave consistently across clients and server.
+
+https://github.com/user-attachments/assets/199ca9f0-3054-401c-8a0e-1fa123093888
 
 # Implemented Multiplayer Features : 
 - **Custom Multiplayer Plugin** integrating Steam Online Subsystem: Hosting/Joining sessions online, with associated Lobby level and session travel for all game modes.
