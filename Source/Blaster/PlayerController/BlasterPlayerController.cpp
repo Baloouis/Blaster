@@ -259,6 +259,7 @@ void ABlasterPlayerController::StopHighPingWarning()
 	}
 }
 
+
 void ABlasterPlayerController::CheckTimeSync(float DeltaTime)
 {
 	TimeSyncRunningTime += DeltaTime;
@@ -268,6 +269,55 @@ void ABlasterPlayerController::CheckTimeSync(float DeltaTime)
 		TimeSyncRunningTime = 0.f;
 	}
 }
+
+
+
+void ABlasterPlayerController::ShowHitMarker()
+{
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
+	if (BlasterCharacter)
+	{
+		//IF I AM THE SERVER PLAYER AND I HIT A CHARACTER SHOW HIT MARKER Locally
+		if (BlasterCharacter->HasAuthority() && BlasterCharacter->IsLocallyControlled())
+		{
+			LocalShowHitMarker();
+		}
+		else
+		{
+			//Display Hitmarker on the Owning Client
+			ClientShowHitMarker();
+		}
+	}
+}
+void ABlasterPlayerController::ClientShowHitMarker_Implementation()
+{
+	ABlasterCharacter* BlasterCharacter = Cast<ABlasterCharacter>(GetPawn());
+	if (BlasterCharacter->IsLocallyControlled())
+	{
+		LocalShowHitMarker();
+	}
+	else
+	{
+		//an issue has been made in the method calls 
+	}
+}
+void ABlasterPlayerController::LocalShowHitMarker()
+{
+	BlasterHUD = BlasterHUD == nullptr ? Cast<ABlasterHUD>(GetHUD()) : BlasterHUD;
+	bool bHUDValid = BlasterHUD &&
+		BlasterHUD->CharacterOverlay &&
+		BlasterHUD->CharacterOverlay->HitMarkerImage &&
+		BlasterHUD->CharacterOverlay->HitMarkerAnimation;
+	if (bHUDValid)
+	{
+		BlasterHUD->CharacterOverlay->HitMarkerImage->SetOpacity(1.f);
+		BlasterHUD->CharacterOverlay->PlayAnimation(
+			BlasterHUD->CharacterOverlay->HitMarkerAnimation,
+			0.f,
+			1);
+	}
+}
+
 
 
 void ABlasterPlayerController::OnPossess(APawn* InPawn)

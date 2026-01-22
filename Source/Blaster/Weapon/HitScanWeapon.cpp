@@ -45,6 +45,13 @@ void AHitScanWeapon::Fire(const FVector& HitTarget)
 					this,
 					UDamageType::StaticClass()
 				);
+
+				BlasterOwnerController = BlasterOwnerController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterOwnerController;
+				if (BlasterOwnerController)
+				{
+					BlasterOwnerController->ShowHitMarker();
+				}
+
 			}
 			if (!HasAuthority() && bUseServerSideRewind)
 			{
@@ -129,7 +136,6 @@ void AHitScanWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& Hi
 		{
 			OutHit.ImpactPoint = End;
 		}
-		//DrawDebugSphere(GetWorld(), BeamEnd, 16.f, 12, FColor::Orange, true);
 		
 		if (BeamParticles)
 		{

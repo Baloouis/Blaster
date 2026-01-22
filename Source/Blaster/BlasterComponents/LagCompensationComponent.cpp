@@ -3,6 +3,7 @@
  
 #include "LagCompensationComponent.h"
 #include "Blaster/Character/BlasterCharacter.h"
+#include "Blaster/PlayerController/BlasterPlayerController.h"
 #include "Components/BoxComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Blaster/Blaster.h"
@@ -157,8 +158,8 @@ FServerSideRewindResult ULagCompensationComponent::ProjectileConfirmHit(const FF
  	PathParams.ProjectileRadius = 5.f;
  	PathParams.TraceChannel = ECC_HitBox;
  	PathParams.ActorsToIgnore.Add(GetOwner());
- 	PathParams.DrawDebugTime = 5.f;
- 	PathParams.DrawDebugType = EDrawDebugTrace::ForDuration;
+ 	//PathParams.DrawDebugTime = 5.f;
+ 	//PathParams.DrawDebugType = EDrawDebugTrace::ForDuration;
  
  	FPredictProjectilePathResult PathResult;
  	UGameplayStatics::PredictProjectilePath(this, PathParams, PathResult);
@@ -545,6 +546,12 @@ FFramePackage ULagCompensationComponent::GetFrameToCheck(ABlasterCharacter* HitC
  			DamageCauser,
  			UDamageType::StaticClass()
  		);
+
+        ABlasterPlayerController* BlasterController = Cast<ABlasterPlayerController>(Character->Controller);
+        if (BlasterController)
+        {
+            BlasterController->ShowHitMarker();
+        }
  	}
  }
 
@@ -563,12 +570,19 @@ void ULagCompensationComponent::ProjectileServerScoreRequest_Implementation(ABla
 			Character->GetEquippedWeapon(),
 			UDamageType::StaticClass()
 		);
+
+        ABlasterPlayerController* BlasterController = Cast<ABlasterPlayerController>(Character->Controller);
+        if (BlasterController)
+        {
+            BlasterController->ShowHitMarker();
+        }
 	}
 }
 void ULagCompensationComponent::ShotgunServerScoreRequest_Implementation(const TArray<ABlasterCharacter*>& HitCharacters, const FVector_NetQuantize& TraceStart, const TArray<FVector_NetQuantize>& HitLocations, float HitTime)
 {
 	FShotgunServerSideRewindResult Confirm = ShotgunServerSideRewind(HitCharacters, TraceStart, HitLocations, HitTime);
  
+    bool bShotSomeone = false;
 	for (auto& HitCharacter : HitCharacters)
 	{
 		if (HitCharacter == nullptr ||  Character == nullptr || Character->GetEquippedWeapon() == nullptr) continue;
@@ -590,7 +604,20 @@ void ULagCompensationComponent::ShotgunServerScoreRequest_Implementation(const T
 			Character->GetEquippedWeapon(),
 			UDamageType::StaticClass()
 		);
+
+
+        if (!bShotSomeone && TotalDamage > 0.f)
+        {
+            bShotSomeone = true; //at least one character has been shot
+        }
 	}
+
+    //if at least one character was shot, show hitmarker
+    ABlasterPlayerController* BlasterController = Cast<ABlasterPlayerController>(Character->Controller);
+    if (BlasterController)
+    {
+        BlasterController->ShowHitMarker();
+    }
 }
  
 FFramePackage ULagCompensationComponent::InterpBetweenFrames(const FFramePackage& OlderFrame, const FFramePackage& YoungerFrame, float HitTime)

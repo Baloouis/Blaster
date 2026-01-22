@@ -75,7 +75,7 @@ void AWeapon::PollInit()
 	if (!HasSetController && HasAuthority() && BlasterOwnerCharacter && BlasterOwnerCharacter->Controller)
 	{
 		BlasterOwnerController = BlasterOwnerController == nullptr ? Cast<ABlasterPlayerController>(BlasterOwnerCharacter->Controller) : BlasterOwnerController;
-		if (BlasterOwnerController && !BlasterOwnerController->HighPingDelegate.IsBound())
+		if (BlasterOwnerController && !BlasterOwnerController->HighPingDelegate.IsBound() && bUseServerSideRewindDefault)
 		{
 			//we try binding to the delegate here because sometimes due asynchronic calls at the start of the game
 			//we can have high ping but without our default weapon changing its bUserServerSideRewind variable at start
@@ -147,7 +147,7 @@ void AWeapon::OnWeaponStateSet()
 
 void AWeapon::OnPingTooHigh(bool bPingTooHigh)
 {
-	bUseServerSideRewind = !bPingTooHigh;
+	bUseServerSideRewind = (!bPingTooHigh && bUseServerSideRewindDefault);
 }
 
 //Only called on the Clients machines via Replication
@@ -400,16 +400,6 @@ FVector AWeapon::TraceEndWithScatter(const FVector& HitTarget)
 	const FVector RandVec = UKismetMathLibrary::RandomUnitVector() * FMath::FRandRange(0.f, SphereRadius);
 	const FVector EndLoc = SphereCenter + RandVec;
 	const FVector ToEndLoc = EndLoc - TraceStart;
- 
-	/*
-	DrawDebugSphere(GetWorld(), SphereCenter, SphereRadius, 12, FColor::Red, true);
-	DrawDebugSphere(GetWorld(), EndLoc, 4.f, 12, FColor::Orange, true);
-	DrawDebugLine(
-		GetWorld(),
-		TraceStart,
-		FVector(TraceStart + ToEndLoc * TRACE_LENGTH / ToEndLoc.Size()),
-		FColor::Cyan,
-		true);*/
- 
+
 	return FVector(TraceStart + ToEndLoc * TRACE_LENGTH / ToEndLoc.Size());
 }

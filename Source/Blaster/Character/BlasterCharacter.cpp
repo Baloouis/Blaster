@@ -29,6 +29,8 @@
 #include "Microsoft/AllowMicrosoftPlatformTypes.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Sound/SoundCue.h"
+#include <Blaster/Weapon/ProjectileRocket.h>
+#include <Blaster/Weapon/ProjectileGrenade.h>
 
 ABlasterCharacter::ABlasterCharacter()
 {
@@ -875,7 +877,7 @@ void ABlasterCharacter::HideCharacterIfCameraClose()
 //Only called on Clients
 void ABlasterCharacter::OnRep_Health(float LastHealth)
 {
-	UE_LOG(LogTemp, Warning, TEXT("OnRep_Health()"));
+	//UE_LOG(LogTemp, Warning, TEXT("OnRep_Health()"));
 	UpdateHUDHealth();
 	if (!bElimmed && Health < LastHealth)
 	{
@@ -1142,6 +1144,36 @@ void ABlasterCharacter::SimProxiesTurn()
 void ABlasterCharacter::ReceiveDamage(AActor* DamageActor, float Damage, const UDamageType* DamageType,
 	class AController* InstigatorController, AActor* DamageCauser)
 {
+	/*
+	FString logString = "ReceiveDamage() : ";
+	logString += "DA : "+DamageActor->GetName() + " , ";
+	logString += "DC : " + DamageCauser->GetName() + " , ";
+	logString += "IC : " + InstigatorController->GetName() + " , ";
+	*/
+	bool bIsRocketProjectile = Cast<AProjectileRocket>(DamageCauser) != nullptr;
+	bool bIsGrenadeProjectile = Cast<AProjectileGrenade>(DamageCauser) != nullptr;
+
+	APawn* DamagedPawn = Cast<APawn>(DamageActor);
+	bool bIsSelfDamage = DamagedPawn && (DamagedPawn->Controller == InstigatorController);
+
+	/*
+	logString += "DP : " + DamagedPawn->GetName() + " , ";
+	logString = bIsRocketProjectile ? logString + " isRocket, " : logString;
+	logString = bIsGrenadeProjectile ? logString + " isGrenade, " : logString;
+	logString = bIsSelfDamage ? logString + " issSelfDamage, " : logString;
+	UE_LOG(LogTemp, Warning, TEXT("%s"), *logString);
+	*/
+
+	//Handle here hitmarkers for explosives ( rocket / grenades ) as it cannot be done elsewhere
+	if (!bIsSelfDamage && (bIsRocketProjectile || bIsGrenadeProjectile))
+	{
+		ABlasterPlayerController* BlasterInstigatorController = Cast<ABlasterPlayerController>(InstigatorController);
+		if (BlasterInstigatorController)
+		{
+			BlasterInstigatorController->ShowHitMarker();
+		}
+	}
+
 	BlasterGameMode = BlasterGameMode == nullptr ? GetWorld()->GetAuthGameMode<ABlasterGameMode>() : BlasterGameMode;
 	if (bElimmed || BlasterGameMode == nullptr) return;
 	Damage = BlasterGameMode->CalculateDamage(InstigatorController, Controller, Damage);

@@ -130,6 +130,12 @@ void AShotgun::FireShotgun(const TArray<FVector_NetQuantize>& HitTargets)
 						this,
 						UDamageType::StaticClass()
 					);
+
+					BlasterOwnerController = BlasterOwnerController == nullptr ? Cast<ABlasterPlayerController>(InstigatorController) : BlasterOwnerController;
+					if (BlasterOwnerController)
+					{
+						BlasterOwnerController->ShowHitMarker();
+					}
 				}
 			}
 		}

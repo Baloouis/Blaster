@@ -57,6 +57,9 @@ void AProjectileBullet::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, 
 				UGameplayStatics::ApplyDamage(OtherActor, DamageToCause, OwnerController, this, UDamageType::StaticClass());
 
 				Super::OnHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
+
+				OwnerController->ShowHitMarker();
+				
 				return;
 			}
 			ABlasterCharacter* HitCharacter = Cast<ABlasterCharacter>(OtherActor);

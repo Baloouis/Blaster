@@ -134,10 +134,10 @@ void UReturnToMainMenu::ReturnButtonClicked()
 
 void UReturnToMainMenu::OnPlayerLeftGame()
 {
-	UE_LOG(LogTemp, Warning, TEXT("OnPlayerLeftGame()"))
+	//UE_LOG(LogTemp, Warning, TEXT("OnPlayerLeftGame()"))
 	if (MultiplayerSessionsSubsystem)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MultiplayerSessionsSubsystem valid"))
+		//UE_LOG(LogTemp, Warning, TEXT("MultiplayerSessionsSubsystem valid"))
 		MultiplayerSessionsSubsystem->DestroySession();
 	}
 }

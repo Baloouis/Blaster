@@ -101,7 +101,7 @@ protected:
 	void ServerFire(const FVector_NetQuantize& TraceHitTarget, float FireDelay);
 
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
+	void MulticastFire(const FVector_NetQuantize& TraceHitTarget); // A multicast RPC called from the server is executed on the Server and all Clients
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerShotgunFire(const TArray<FVector_NetQuantize>& TraceHitTargets, float FireDelay);

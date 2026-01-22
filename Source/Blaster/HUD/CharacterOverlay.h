@@ -54,6 +54,11 @@ public:
  	UPROPERTY(meta = (BindWidgetAnim), Transient)
  	UWidgetAnimation* HighPingAnimation;
 
+	UPROPERTY(meta = (BindWidget))
+	class UImage* HitMarkerImage;
+
+	UPROPERTY(meta = (BindWidgetAnim), Transient)
+	UWidgetAnimation* HitMarkerAnimation;
 	
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* RedTeamScore;

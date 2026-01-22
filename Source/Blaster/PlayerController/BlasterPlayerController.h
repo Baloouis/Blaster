@@ -39,6 +39,8 @@ public:
 	void HandleMatchHasStarted(bool bTeamsMatch = false);
 	void HandleCooldown();
 
+	void ShowHitMarker();
+
 	float SingleTripTime = 0.f;
 
 	FHighPingDelegate HighPingDelegate;
@@ -112,7 +114,6 @@ private:
 	
 	bool bReturnToMainMenuOpen = false;
 
-	
 	UPROPERTY()
 	class ABlasterGameMode* BlasterGameMode;
 	
@@ -164,4 +165,9 @@ private:
 	UPROPERTY(EditAnywhere)
 	float HighPingThreshold = 50.f;
 	
+	UFUNCTION(Client, Unreliable)
+	void ClientShowHitMarker();
+
+	void LocalShowHitMarker();
+
 };

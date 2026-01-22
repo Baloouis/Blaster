@@ -25,6 +25,7 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 		SpawnParams.Instigator = InstigatorPawn;
  
 		AProjectile* SpawnedProjectile = nullptr;
+
 		if (bUseServerSideRewind)
 		{
 			if (InstigatorPawn->HasAuthority()) // server
@@ -49,10 +50,19 @@ void AProjectileWeapon::Fire(const FVector& HitTarget)
 				if (InstigatorPawn->IsLocallyControlled()) // client, locally controlled - spawn non-replicated projectile, use SSR
 				{
 					SpawnedProjectile = World->SpawnActor<AProjectile>(ServerSideRewindProjectileClass, SocketTransform.GetLocation(), TargetRotation, SpawnParams);
-					SpawnedProjectile->bUseServerSideRewind = true;
-					SpawnedProjectile->TraceStart = SocketTransform.GetLocation();
-					SpawnedProjectile->InitialVelocity = SpawnedProjectile->GetActorForwardVector() * SpawnedProjectile->InitialSpeed;
-					SpawnedProjectile->FiringWeapon = this;
+					if (SpawnedProjectile)
+					{
+						SpawnedProjectile->bUseServerSideRewind = true;
+						SpawnedProjectile->TraceStart = SocketTransform.GetLocation();
+						SpawnedProjectile->InitialVelocity = SpawnedProjectile->GetActorForwardVector() * SpawnedProjectile->InitialSpeed;
+						SpawnedProjectile->FiringWeapon = this;
+					}
+					else
+					{
+						FString s = "nullptr for ssr projectile";
+						UE_LOG(LogTemp, Error, TEXT("%s"), *s);
+					}
+
 				}
 				else // client, not locally controlled - spawn non-replicated projectile, no SSR
 				{
