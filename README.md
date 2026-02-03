@@ -3,7 +3,7 @@
 
 It uses Unreal Engine’s Authoritative Client-Server model and was developed while following Stephen Ulibarri’s Udemy course "UE5 C++ Multiplayer Shooter".
 
-It features custom multiplayer systems (lag compensation, prediction, rewind, cheating prevention) along with full gameplay implementation: different weapons, complex characters animations, various game modes, and UI.
+It features custom multiplayer systems (lag compensation, client-side prediction, server-side rewind, cheating prevention) along with full gameplay implementation: different weapons, complex characters animations, various game modes, and UI.
 
 https://github.com/user-attachments/assets/48d607d5-0da4-4f6b-8945-6a2bccedb21b
 
